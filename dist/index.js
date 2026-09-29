@@ -103,13 +103,13 @@ function fb() {
   var D = w.prototype = new O();
   D.constructor = w, f(D, E.prototype), D.isPureReactComponent = !0;
   var x = Array.isArray, T = { H: null, A: null, T: null, S: null, V: null }, M = Object.prototype.hasOwnProperty;
-  function k(j, K, ae, se, le, Pe) {
-    return ae = Pe.ref, {
+  function k(j, K, ae, se, le, Le) {
+    return ae = Le.ref, {
       $$typeof: t,
       type: j,
       key: K,
       ref: ae !== void 0 ? ae : null,
-      props: Pe
+      props: Le
     };
   }
   function q(j, K) {
@@ -161,12 +161,12 @@ function fb() {
     throw j;
   }
   function me(j, K, ae, se, le) {
-    var Pe = typeof j;
-    (Pe === "undefined" || Pe === "boolean") && (j = null);
+    var Le = typeof j;
+    (Le === "undefined" || Le === "boolean") && (j = null);
     var Y = !1;
     if (j === null) Y = !0;
     else
-      switch (Pe) {
+      switch (Le) {
         case "bigint":
         case "string":
         case "number":
@@ -202,23 +202,23 @@ function fb() {
     var ge = se === "" ? "." : se + ":";
     if (x(j))
       for (var ve = 0; ve < j.length; ve++)
-        se = j[ve], Pe = ge + $(se, ve), Y += me(
+        se = j[ve], Le = ge + $(se, ve), Y += me(
           se,
           K,
           ae,
-          Pe,
+          Le,
           le
         );
     else if (ve = _(j), typeof ve == "function")
       for (j = ve.call(j), ve = 0; !(se = j.next()).done; )
-        se = se.value, Pe = ge + $(se, ve++), Y += me(
+        se = se.value, Le = ge + $(se, ve++), Y += me(
           se,
           K,
           ae,
-          Pe,
+          Le,
           le
         );
-    else if (Pe === "object") {
+    else if (Le === "object") {
       if (typeof j.then == "function")
         return me(
           fe(j),
@@ -236,8 +236,8 @@ function fb() {
   function U(j, K, ae) {
     if (j == null) return j;
     var se = [], le = 0;
-    return me(j, se, "", "", function(Pe) {
-      return K.call(ae, Pe, le++);
+    return me(j, se, "", "", function(Le) {
+      return K.call(ae, Le, le++);
     }), se;
   }
   function te(j) {
@@ -315,9 +315,9 @@ function fb() {
       throw Error(
         "The argument must be a React element, but you passed " + j + "."
       );
-    var se = f({}, j.props), le = j.key, Pe = void 0;
+    var se = f({}, j.props), le = j.key, Le = void 0;
     if (K != null)
-      for (Y in K.ref !== void 0 && (Pe = void 0), K.key !== void 0 && (le = "" + K.key), K)
+      for (Y in K.ref !== void 0 && (Le = void 0), K.key !== void 0 && (le = "" + K.key), K)
         !M.call(K, Y) || Y === "key" || Y === "__self" || Y === "__source" || Y === "ref" && K.ref === void 0 || (se[Y] = K[Y]);
     var Y = arguments.length - 2;
     if (Y === 1) se.children = ae;
@@ -326,7 +326,7 @@ function fb() {
         ge[ve] = arguments[ve + 2];
       se.children = ge;
     }
-    return k(j.type, le, void 0, void 0, Pe, se);
+    return k(j.type, le, void 0, void 0, Le, se);
   }, ke.createContext = function(j) {
     return j = {
       $$typeof: h,
@@ -340,9 +340,9 @@ function fb() {
       _context: j
     }, j;
   }, ke.createElement = function(j, K, ae) {
-    var se, le = {}, Pe = null;
+    var se, le = {}, Le = null;
     if (K != null)
-      for (se in K.key !== void 0 && (Pe = "" + K.key), K)
+      for (se in K.key !== void 0 && (Le = "" + K.key), K)
         M.call(K, se) && se !== "key" && se !== "__self" && se !== "__source" && (le[se] = K[se]);
     var Y = arguments.length - 2;
     if (Y === 1) le.children = ae;
@@ -354,7 +354,7 @@ function fb() {
     if (j && j.defaultProps)
       for (se in Y = j.defaultProps, Y)
         le[se] === void 0 && (le[se] = Y[se]);
-    return k(j, Pe, void 0, void 0, null, le);
+    return k(j, Le, void 0, void 0, null, le);
   }, ke.createRef = function() {
     return { current: null };
   }, ke.forwardRef = function(j) {
@@ -377,8 +377,8 @@ function fb() {
     try {
       var se = j(), le = T.S;
       le !== null && le(ae, se), typeof se == "object" && se !== null && typeof se.then == "function" && se.then(je, ue);
-    } catch (Pe) {
-      ue(Pe);
+    } catch (Le) {
+      ue(Le);
     } finally {
       T.T = K;
     }
@@ -468,11 +468,11 @@ function hb() {
       if (ue !== te) {
         U[0] = ue;
         e: for (var je = 0, j = U.length, K = j >>> 1; je < K; ) {
-          var ae = 2 * (je + 1) - 1, se = U[ae], le = ae + 1, Pe = U[le];
+          var ae = 2 * (je + 1) - 1, se = U[ae], le = ae + 1, Le = U[le];
           if (0 > o(se, ue))
-            le < j && 0 > o(Pe, se) ? (U[je] = Pe, U[le] = ue, je = le) : (U[je] = se, U[ae] = ue, je = ae);
-          else if (le < j && 0 > o(Pe, ue))
-            U[je] = Pe, U[le] = ue, je = le;
+            le < j && 0 > o(Le, se) ? (U[je] = Le, U[le] = ue, je = le) : (U[je] = se, U[ae] = ue, je = ae);
+          else if (le < j && 0 > o(Le, ue))
+            U[je] = Le, U[le] = ue, je = le;
           else break e;
         }
       }
@@ -1003,9 +1003,9 @@ function mb() {
   function se(e, n) {
     j++, je[j] = e.current, e.current = n;
   }
-  var le = K(null), Pe = K(null), Y = K(null), ge = K(null);
+  var le = K(null), Le = K(null), Y = K(null), ge = K(null);
   function ve(e, n) {
-    switch (se(Y, n), se(Pe, e), se(le, null), n.nodeType) {
+    switch (se(Y, n), se(Le, e), se(le, null), n.nodeType) {
       case 9:
       case 11:
         e = (e = n.documentElement) && (e = e.namespaceURI) ? Og(e) : 0;
@@ -1028,17 +1028,17 @@ function mb() {
     ae(le), se(le, e);
   }
   function Xe() {
-    ae(le), ae(Pe), ae(Y);
+    ae(le), ae(Le), ae(Y);
   }
   function it(e) {
     e.memoizedState !== null && se(ge, e);
     var n = le.current, a = Ng(n, e.type);
-    n !== a && (se(Pe, e), se(le, a));
+    n !== a && (se(Le, e), se(le, a));
   }
   function Re(e) {
-    Pe.current === e && (ae(le), ae(Pe)), ge.current === e && (ae(ge), Ms._currentValue = ue);
+    Le.current === e && (ae(le), ae(Le)), ge.current === e && (ae(ge), Ms._currentValue = ue);
   }
-  var P = Object.prototype.hasOwnProperty, re = t.unstable_scheduleCallback, ne = t.unstable_cancelCallback, ye = t.unstable_shouldYield, Ee = t.unstable_requestPaint, be = t.unstable_now, ze = t.unstable_getCurrentPriorityLevel, Ze = t.unstable_ImmediatePriority, de = t.unstable_UserBlockingPriority, he = t.unstable_NormalPriority, Ve = t.unstable_LowPriority, we = t.unstable_IdlePriority, Fe = t.log, Ar = t.unstable_setDisableYieldValue, tr = null, mt = null;
+  var P = Object.prototype.hasOwnProperty, re = t.unstable_scheduleCallback, ne = t.unstable_cancelCallback, ye = t.unstable_shouldYield, Ee = t.unstable_requestPaint, be = t.unstable_now, Pe = t.unstable_getCurrentPriorityLevel, Ze = t.unstable_ImmediatePriority, de = t.unstable_UserBlockingPriority, he = t.unstable_NormalPriority, Ve = t.unstable_LowPriority, we = t.unstable_IdlePriority, Fe = t.log, Ar = t.unstable_setDisableYieldValue, tr = null, mt = null;
   function Zn(e) {
     if (typeof Fe == "function" && Ar(e), mt && typeof mt.setStrictMode == "function")
       try {
@@ -3009,7 +3009,7 @@ Error generating stack: ` + a.message + `
   function Oc() {
     gr = zl.current, ae(si), ae(zl);
   }
-  var Rr = 0, Le = null, Je = null, _t = null, Ll = !1, li = !1, _a = !1, Pl = 0, cs = 0, oi = null, R2 = 0;
+  var Rr = 0, ze = null, Je = null, _t = null, Ll = !1, li = !1, _a = !1, Pl = 0, cs = 0, oi = null, R2 = 0;
   function gt() {
     throw Error(s(321));
   }
@@ -3020,7 +3020,7 @@ Error generating stack: ` + a.message + `
     return !0;
   }
   function Dc(e, n, a, l, c, m) {
-    return Rr = m, Le = n, n.memoizedState = null, n.updateQueue = null, n.lanes = 0, U.H = e === null || e.memoizedState === null ? lm : om, _a = !1, m = a(l, c), _a = !1, li && (m = Ap(
+    return Rr = m, ze = n, n.memoizedState = null, n.updateQueue = null, n.lanes = 0, U.H = e === null || e.memoizedState === null ? lm : om, _a = !1, m = a(l, c), _a = !1, li && (m = Ap(
       n,
       a,
       l,
@@ -3030,11 +3030,11 @@ Error generating stack: ` + a.message + `
   function wp(e) {
     U.H = Zl;
     var n = Je !== null && Je.next !== null;
-    if (Rr = 0, _t = Je = Le = null, Ll = !1, cs = 0, oi = null, n) throw Error(s(300));
+    if (Rr = 0, _t = Je = ze = null, Ll = !1, cs = 0, oi = null, n) throw Error(s(300));
     e === null || Nt || (e = e.dependencies, e !== null && Dl(e) && (Nt = !0));
   }
   function Ap(e, n, a, l) {
-    Le = e;
+    ze = e;
     var c = 0;
     do {
       if (li && (oi = null), cs = 0, li = !1, 25 <= c) throw Error(s(301));
@@ -3048,7 +3048,7 @@ Error generating stack: ` + a.message + `
   }
   function j2() {
     var e = U.H, n = e.useState()[0];
-    return n = typeof n.then == "function" ? fs(n) : n, e = e.useState()[0], (Je !== null ? Je.memoizedState : null) !== e && (Le.flags |= 1024), n;
+    return n = typeof n.then == "function" ? fs(n) : n, e = e.useState()[0], (Je !== null ? Je.memoizedState : null) !== e && (ze.flags |= 1024), n;
   }
   function Mc() {
     var e = Pl !== 0;
@@ -3065,7 +3065,7 @@ Error generating stack: ` + a.message + `
       }
       Ll = !1;
     }
-    Rr = 0, _t = Je = Le = null, li = !1, cs = Pl = 0, oi = null;
+    Rr = 0, _t = Je = ze = null, li = !1, cs = Pl = 0, oi = null;
   }
   function Qt() {
     var e = {
@@ -3075,26 +3075,26 @@ Error generating stack: ` + a.message + `
       queue: null,
       next: null
     };
-    return _t === null ? Le.memoizedState = _t = e : _t = _t.next = e, _t;
+    return _t === null ? ze.memoizedState = _t = e : _t = _t.next = e, _t;
   }
   function bt() {
     if (Je === null) {
-      var e = Le.alternate;
+      var e = ze.alternate;
       e = e !== null ? e.memoizedState : null;
     } else e = Je.next;
-    var n = _t === null ? Le.memoizedState : _t.next;
+    var n = _t === null ? ze.memoizedState : _t.next;
     if (n !== null)
       _t = n, Je = e;
     else {
       if (e === null)
-        throw Le.alternate === null ? Error(s(467)) : Error(s(310));
+        throw ze.alternate === null ? Error(s(467)) : Error(s(310));
       Je = e, e = {
         memoizedState: Je.memoizedState,
         baseState: Je.baseState,
         baseQueue: Je.baseQueue,
         queue: Je.queue,
         next: null
-      }, _t === null ? Le.memoizedState = _t = e : _t = _t.next = e;
+      }, _t === null ? ze.memoizedState = _t = e : _t = _t.next = e;
     }
     return _t;
   }
@@ -3103,7 +3103,7 @@ Error generating stack: ` + a.message + `
   }
   function fs(e) {
     var n = cs;
-    return cs += 1, oi === null && (oi = []), e = _p(oi, e, n), n = Le, (_t === null ? n.memoizedState : _t.next) === null && (n = n.alternate, U.H = n === null || n.memoizedState === null ? lm : om), e;
+    return cs += 1, oi === null && (oi = []), e = _p(oi, e, n), n = ze, (_t === null ? n.memoizedState : _t.next) === null && (n = n.alternate, U.H = n === null || n.memoizedState === null ? lm : om), e;
   }
   function Il(e) {
     if (e !== null && typeof e == "object") {
@@ -3113,9 +3113,9 @@ Error generating stack: ` + a.message + `
     throw Error(s(438, String(e)));
   }
   function zc(e) {
-    var n = null, a = Le.updateQueue;
+    var n = null, a = ze.updateQueue;
     if (a !== null && (n = a.memoCache), n == null) {
-      var l = Le.alternate;
+      var l = ze.alternate;
       l !== null && (l = l.updateQueue, l !== null && (l = l.memoCache, l != null && (n = {
         data: l.data.map(function(c) {
           return c.slice();
@@ -3123,7 +3123,7 @@ Error generating stack: ` + a.message + `
         index: 0
       })));
     }
-    if (n == null && (n = { data: [], index: 0 }), a === null && (a = jc(), Le.updateQueue = a), a.memoCache = n, a = n.data[n.index], a === void 0)
+    if (n == null && (n = { data: [], index: 0 }), a === null && (a = jc(), ze.updateQueue = a), a.memoCache = n, a = n.data[n.index], a === void 0)
       for (a = n.data[n.index] = Array(e), l = 0; l < e; l++)
         a[l] = B;
     return n.index++, a;
@@ -3175,7 +3175,7 @@ Error generating stack: ` + a.message + `
               hasEagerState: H.hasEagerState,
               eagerState: H.eagerState,
               next: null
-            }, R === null ? (N = R = J, C = m) : R = R.next = J, Le.lanes |= Z, Ur |= Z;
+            }, R === null ? (N = R = J, C = m) : R = R.next = J, ze.lanes |= Z, Ur |= Z;
           J = H.action, _a && a(m, J), m = H.hasEagerState ? H.eagerState : a(m, J);
         } else
           Z = {
@@ -3185,7 +3185,7 @@ Error generating stack: ` + a.message + `
             hasEagerState: H.hasEagerState,
             eagerState: H.eagerState,
             next: null
-          }, R === null ? (N = R = Z, C = m) : R = R.next = Z, Le.lanes |= J, Ur |= J;
+          }, R === null ? (N = R = Z, C = m) : R = R.next = Z, ze.lanes |= J, Ur |= J;
         H = H.next;
       } while (H !== null && H !== n);
       if (R === null ? C = m : R.next = N, !sn(m, e.memoizedState) && (Nt = !0, X && (a = ii, a !== null)))
@@ -3210,7 +3210,7 @@ Error generating stack: ` + a.message + `
     return [m, l];
   }
   function Tp(e, n, a) {
-    var l = Le, c = bt(), m = $e;
+    var l = ze, c = bt(), m = $e;
     if (m) {
       if (a === void 0) throw Error(s(407));
       a = a();
@@ -3239,7 +3239,7 @@ Error generating stack: ` + a.message + `
     return a;
   }
   function Op(e, n, a) {
-    e.flags |= 16384, e = { getSnapshot: n, value: a }, n = Le.updateQueue, n === null ? (n = jc(), Le.updateQueue = n, n.stores = [e]) : (a = n.stores, a === null ? n.stores = [e] : a.push(e));
+    e.flags |= 16384, e = { getSnapshot: n, value: a }, n = ze.updateQueue, n === null ? (n = jc(), ze.updateQueue = n, n.stores = [e]) : (a = n.stores, a === null ? n.stores = [e] : a.push(e));
   }
   function Np(e, n, a, l) {
     n.value = a, n.getSnapshot = l, Mp(n) && kp(e);
@@ -3365,7 +3365,7 @@ Error generating stack: ` + a.message + `
       var a = rt.formState;
       if (a !== null) {
         e: {
-          var l = Le;
+          var l = ze;
           if ($e) {
             if (ht) {
               t: {
@@ -3405,11 +3405,11 @@ Error generating stack: ` + a.message + `
       lastRenderedState: n
     }, a.queue = l, a = am.bind(
       null,
-      Le,
+      ze,
       l
     ), l.dispatch = a, l = Ic(!1), m = Fc.bind(
       null,
-      Le,
+      ze,
       !1,
       l.queue
     ), l = Qt(), c = {
@@ -3419,7 +3419,7 @@ Error generating stack: ` + a.message + `
       pending: null
     }, l.queue = c, a = z2.bind(
       null,
-      Le,
+      ze,
       c,
       m,
       a
@@ -3443,7 +3443,7 @@ Error generating stack: ` + a.message + `
     else l = n;
     n = bt();
     var c = n.queue, m = c.dispatch;
-    return a !== n.memoizedState && (Le.flags |= 2048, ui(
+    return a !== n.memoizedState && (ze.flags |= 2048, ui(
       9,
       Ul(),
       L2.bind(null, c, a),
@@ -3462,7 +3462,7 @@ Error generating stack: ` + a.message + `
     return a.memoizedState = e, [n, l, !1];
   }
   function ui(e, n, a, l) {
-    return e = { tag: e, create: a, deps: l, inst: n, next: null }, n = Le.updateQueue, n === null && (n = jc(), Le.updateQueue = n), a = n.lastEffect, a === null ? n.lastEffect = e.next = e : (l = a.next, a.next = e, e.next = l, n.lastEffect = e), e;
+    return e = { tag: e, create: a, deps: l, inst: n, next: null }, n = ze.updateQueue, n === null && (n = jc(), ze.updateQueue = n), a = n.lastEffect, a === null ? n.lastEffect = e.next = e : (l = a.next, a.next = e, e.next = l, n.lastEffect = e), e;
   }
   function Ul() {
     return { destroy: void 0, resource: void 0 };
@@ -3472,7 +3472,7 @@ Error generating stack: ` + a.message + `
   }
   function Hl(e, n, a, l) {
     var c = Qt();
-    l = l === void 0 ? null : l, Le.flags |= e, c.memoizedState = ui(
+    l = l === void 0 ? null : l, ze.flags |= e, c.memoizedState = ui(
       1 | n,
       Ul(),
       a,
@@ -3483,7 +3483,7 @@ Error generating stack: ` + a.message + `
     var c = bt();
     l = l === void 0 ? null : l;
     var m = c.memoizedState.inst;
-    Je !== null && l !== null && Nc(l, Je.memoizedState.deps) ? c.memoizedState = ui(n, m, a, l) : (Le.flags |= e, c.memoizedState = ui(
+    Je !== null && l !== null && Nc(l, Je.memoizedState.deps) ? c.memoizedState = ui(n, m, a, l) : (ze.flags |= e, c.memoizedState = ui(
       1 | n,
       m,
       a,
@@ -3543,10 +3543,10 @@ Error generating stack: ` + a.message + `
     return a.memoizedState = [l, n], l;
   }
   function Hc(e, n, a) {
-    return a === void 0 || (Rr & 1073741824) !== 0 ? e.memoizedState = n : (e.memoizedState = a, e = eg(), Le.lanes |= e, Ur |= e, a);
+    return a === void 0 || (Rr & 1073741824) !== 0 ? e.memoizedState = n : (e.memoizedState = a, e = eg(), ze.lanes |= e, Ur |= e, a);
   }
   function Jp(e, n, a, l) {
-    return sn(a, n) ? a : si.current !== null ? (e = Hc(e, a, l), sn(e, n) || (Nt = !0), e) : (Rr & 42) === 0 ? (Nt = !0, e.memoizedState = a) : (e = eg(), Le.lanes |= e, Ur |= e, n);
+    return sn(a, n) ? a : si.current !== null ? (e = Hc(e, a, l), sn(e, n) || (Nt = !0), e) : (Rr & 42) === 0 ? (Nt = !0, e.memoizedState = a) : (e = eg(), ze.lanes |= e, Ur |= e, n);
   }
   function Wp(e, n, a, l, c) {
     var m = te.p;
@@ -3718,7 +3718,7 @@ Error generating stack: ` + a.message + `
   }
   function ql(e) {
     var n = e.alternate;
-    return e === Le || n !== null && n === Le;
+    return e === ze || n !== null && n === ze;
   }
   function im(e, n) {
     li = Ll = !0;
@@ -3815,7 +3815,7 @@ Error generating stack: ` + a.message + `
         lastRenderedState: c
       }, l.queue = e, e = e.dispatch = B2.bind(
         null,
-        Le,
+        ze,
         e
       ), [l.memoizedState, e];
     },
@@ -3825,7 +3825,7 @@ Error generating stack: ` + a.message + `
     },
     useState: function(e) {
       e = Ic(e);
-      var n = e.queue, a = am.bind(null, Le, n);
+      var n = e.queue, a = am.bind(null, ze, n);
       return n.dispatch = a, [e.memoizedState, a];
     },
     useDebugValue: Uc,
@@ -3837,14 +3837,14 @@ Error generating stack: ` + a.message + `
       var e = Ic(!1);
       return e = Wp.bind(
         null,
-        Le,
+        ze,
         e.queue,
         !0,
         !1
       ), Qt().memoizedState = e, [!1, e];
     },
     useSyncExternalStore: function(e, n, a) {
-      var l = Le, c = Qt();
+      var l = ze, c = Qt();
       if ($e) {
         if (a === void 0)
           throw Error(s(407));
@@ -3895,7 +3895,7 @@ Error generating stack: ` + a.message + `
       };
       return n.queue = a, n = Fc.bind(
         null,
-        Le,
+        ze,
         !0,
         a
       ), a.dispatch = n, [e, n];
@@ -3904,7 +3904,7 @@ Error generating stack: ` + a.message + `
     useCacheRefresh: function() {
       return Qt().memoizedState = I2.bind(
         null,
-        Le
+        ze
       );
     }
   }, om = {
@@ -7244,7 +7244,7 @@ Error generating stack: ` + a.message + `
     return gr = n, Cl(), a;
   }
   function rg(e, n) {
-    Le = null, U.H = Zl, n === is || n === Rl ? (n = bp(), Ke = 3) : n === vp ? (n = bp(), Ke = 4) : Ke = n === Sm ? 8 : n !== null && typeof n == "object" && typeof n.then == "function" ? 6 : 1, cn = n, Be === null && (dt = 1, Xl(
+    ze = null, U.H = Zl, n === is || n === Rl ? (n = bp(), Ke = 3) : n === vp ? (n = bp(), Ke = 4) : Ke = n === Sm ? 8 : n !== null && typeof n == "object" && typeof n.then == "function" ? 6 : 1, cn = n, Be === null && (dt = 1, Xl(
       e,
       xn(n, e.current)
     ));
@@ -9914,7 +9914,7 @@ Error generating stack: ` + a.message + `
       case "pointerleave":
         return 8;
       case "message":
-        switch (ze()) {
+        switch (Pe()) {
           case Ze:
             return 2;
           case de:
@@ -11723,10 +11723,10 @@ async function d0(t, {
   const se = K();
   if (se <= 0)
     return { result: [], warnings: ae };
-  const le = new NS(se), Pe = B.ToolManager.isToolCallingSupported(), Y = b?.start ?? 0, ge = b != null && b.end ? b.end + 1 : void 0;
+  const le = new NS(se), Le = B.ToolManager.isToolCallingSupported(), Y = b?.start ?? 0, ge = b != null && b.end ? b.end + 1 : void 0;
   let ve = Y === -1 && ge === 0 ? [] : B.chat.slice(Y, ge).filter((de) => {
     var he;
-    return !de.is_system || Pe && Array.isArray((he = de.extra) == null ? void 0 : he.tool_invocations);
+    return !de.is_system || Le && Array.isArray((he = de.extra) == null ? void 0 : he.tool_invocations);
   });
   ve = await Promise.all(
     ve.map(async (de, he) => {
@@ -11911,7 +11911,7 @@ ${de.extra.title}`), {
       Zt.identifier === "chatHistory" && be();
     });
   }
-  const ze = [
+  const Pe = [
     "1_memory",
     "2_floating_prompt",
     "3_vectors",
@@ -11924,7 +11924,7 @@ ${de.extra.title}`), {
   for (const de in B.extensionPrompts)
     if (Object.hasOwn(B.extensionPrompts, de)) {
       const he = B.extensionPrompts[de];
-      if (ze.includes(de) || !B.extensionPrompts[de].value || ![Ca.BEFORE_PROMPT, Ca.IN_PROMPT].includes(he.position) || typeof he.filter == "function" && !await he.filter()) continue;
+      if (Pe.includes(de) || !B.extensionPrompts[de].value || ![Ca.BEFORE_PROMPT, Ca.IN_PROMPT].includes(he.position) || typeof he.filter == "function" && !await he.filter()) continue;
       const Ve = {
         role: wa(he.role) ?? "system",
         content: he.value
@@ -23216,14 +23216,14 @@ const E1 = ({ originalContent: t, newContent: r }) => {
       if (!it) return Y;
       const Re = { core: {}, alternate_greetings: {}, draft: {} };
       if ((/* @__PURE__ */ new Set([...Object.keys(ve.fields), ...Object.keys(ge.fields)])).forEach((Ee) => {
-        const be = ve.fields[Ee]?.value ?? "", ze = ge.fields[Ee]?.value ?? "";
-        if (be !== ze) {
+        const be = ve.fields[Ee]?.value ?? "", Pe = ge.fields[Ee]?.value ?? "";
+        if (be !== Pe) {
           const Ze = ge.fields[Ee];
           Ze && (Ee.startsWith("alternate_greetings_") ? Re.alternate_greetings[Ze.label] = Ze.value : Kn.includes(Ee) && (Re.core[Ze.label] = Ze.value));
         }
       }), (/* @__PURE__ */ new Set([...Object.keys(ve.draftFields), ...Object.keys(ge.draftFields)])).forEach((Ee) => {
-        const be = ve.draftFields[Ee]?.value ?? "", ze = ge.draftFields[Ee]?.value ?? "";
-        if (be !== ze && ge.draftFields[Ee]) {
+        const be = ve.draftFields[Ee]?.value ?? "", Pe = ge.draftFields[Ee]?.value ?? "";
+        if (be !== Pe && ge.draftFields[Ee]) {
           const Ze = ge.draftFields[Ee];
           Re.draft[Ze.label] = Ze.value;
         }
@@ -23263,7 +23263,7 @@ const E1 = ({ originalContent: t, newContent: r }) => {
           if (Ee.id === Vh) {
             if (Ht === void 0 && !Un) continue;
             const be = await d0(re, u);
-            be.warnings?.length && be.warnings.forEach((ze) => Ne("warning", ze)), Re.push(...be.result);
+            be.warnings?.length && be.warnings.forEach((Pe) => Ne("warning", Pe)), Re.push(...be.result);
           } else
             Re.push(Ee);
         const ne = Y.slice(0, Y.length - (ge ? 0 : 1)).reverse().find((Ee) => Ee.stateSnapshot)?.stateSnapshot ?? o, ye = it.prompts.existingFieldDefinitions;
@@ -23271,22 +23271,22 @@ const E1 = ({ originalContent: t, newContent: r }) => {
           const Ee = {
             fields: {
               core: Object.fromEntries(
-                Object.entries(ne.fields).filter(([ze]) => !ze.startsWith("alternate_greetings_")).map(([, ze]) => [ze.label, ze.value])
+                Object.entries(ne.fields).filter(([Pe]) => !Pe.startsWith("alternate_greetings_")).map(([, Pe]) => [Pe.label, Pe.value])
               ),
               alternate_greetings: Object.fromEntries(
-                Object.entries(ne.fields).filter(([ze]) => ze.startsWith("alternate_greetings_")).map(([, ze]) => [ze.label, ze.value])
+                Object.entries(ne.fields).filter(([Pe]) => Pe.startsWith("alternate_greetings_")).map(([, Pe]) => [Pe.label, Pe.value])
               ),
-              draft: Object.fromEntries(Object.entries(ne.draftFields).map(([, ze]) => [ze.label, ze.value]))
+              draft: Object.fromEntries(Object.entries(ne.draftFields).map(([, Pe]) => [Pe.label, Pe.value]))
             }
           };
           let be = tn.compile(ye.content, { noEscape: !0 })(Ee);
           if (be = Mi.substituteParams(be), be.trim()) {
-            const ze = {
+            const Pe = {
               id: `temp-state-${Date.now()}`,
               role: "system",
               content: be.trim()
             }, Ze = Re.pop();
-            Re.push(ze), Ze && Re.push(Ze);
+            Re.push(Pe), Ze && Re.push(Ze);
           }
         }
         if (t.isReadonly) {
@@ -23304,13 +23304,13 @@ const E1 = ({ originalContent: t, newContent: r }) => {
             id: `msg-${Date.now()}-ai`,
             role: "assistant",
             content: Ee
-          }, ze = [...Y, be];
-          p(ze), s({ ...t, messages: ze });
+          }, Pe = [...Y, be];
+          p(Pe), s({ ...t, messages: Pe });
         } else {
           const Ee = t.type === "field" ? mA : (() => {
             const Ve = [...Object.keys(ne.fields), ...Object.keys(ne.draftFields)], we = Object.keys(ne.draftFields);
             return yA(Ve, we);
-          })(), ze = await CA(
+          })(), Pe = await CA(
             t.profileId,
             Re,
             Ee,
@@ -23318,10 +23318,10 @@ const E1 = ({ originalContent: t, newContent: r }) => {
             t.promptEngineeringMode,
             it.maxResponseToken,
             k.current.signal
-          ), Ze = OA(ne, ze, t.type, t.targetFieldId), de = {
+          ), Ze = OA(ne, Pe, t.type, t.targetFieldId), de = {
             id: `msg-${Date.now()}-ai`,
             role: "assistant",
-            content: ze.justification,
+            content: Pe.justification,
             stateSnapshot: Ze
           };
           let he = [...Y, de];
@@ -23412,7 +23412,7 @@ const E1 = ({ originalContent: t, newContent: r }) => {
     };
     let Xe = [...h, ve];
     Xe = q(Xe, Y, ge), p(Xe), s({ ...t, messages: Xe }), O(!1);
-  }, Pe = () => {
+  }, Le = () => {
     k.current?.abort();
   };
   return /* @__PURE__ */ A.jsxs("div", { className: "revise-session-chat", children: [
@@ -23577,7 +23577,7 @@ const E1 = ({ originalContent: t, newContent: r }) => {
       ] }) }),
       y && /* @__PURE__ */ A.jsxs("div", { className: "message-bubble-wrapper assistant", children: [
         /* @__PURE__ */ A.jsx("div", { className: "message-bubble assistant loading", children: /* @__PURE__ */ A.jsx("i", { className: "fa-solid fa-spinner fa-spin" }) }),
-        /* @__PURE__ */ A.jsx(Se, { onClick: Pe, className: "danger_button", title: "Cancel Request", children: /* @__PURE__ */ A.jsx("i", { className: "fa-solid fa-stop" }) })
+        /* @__PURE__ */ A.jsx(Se, { onClick: Le, className: "danger_button", title: "Cancel Request", children: /* @__PURE__ */ A.jsx("i", { className: "fa-solid fa-stop" }) })
       ] }),
       /* @__PURE__ */ A.jsx("div", { ref: M })
     ] }),
@@ -23945,8 +23945,8 @@ const Nn = SillyTavern.getContext(), xh = () => ({
   }, q = ee.useCallback(
     (P, re, ne, ye) => {
       s((Ee) => {
-        const be = ye ? "draftFields" : "fields", ze = { ...Ee[be] };
-        return ze[P] || (ze[P] = { value: "", prompt: "", label: P }), ze[P][ne] = re, { ...Ee, [be]: ze };
+        const be = ye ? "draftFields" : "fields", Pe = { ...Ee[be] };
+        return Pe[P] || (Pe[P] = { value: "", prompt: "", label: P }), Pe[P][ne] = re, { ...Ee, [be]: Pe };
       });
     },
     []
@@ -24044,11 +24044,11 @@ const Nn = SillyTavern.getContext(), xh = () => ({
           default:
             break;
         }
-        const be = Ee.type !== "none" && (Ht !== void 0 || !!Un), ze = {};
-        await Promise.all(
-          tv.filter((we) => !ze[we]).map(async (we) => {
+        const be = Ee.type !== "none" && (Ht !== void 0 || !!Un), Pe = {};
+        r.contextToSend.worldInfo && await Promise.all(
+          i.selectedWorldNames.filter((we) => tv.includes(we)).map(async (we) => {
             const Fe = await Nn.loadWorldInfo(we);
-            Fe && (ze[we] = C1(Fe, { includeDisabled: !0 }));
+            Fe && (Pe[we] = C1(Fe, { includeDisabled: !0 }));
           })
         );
         const Ze = structuredClone(r.prompts);
@@ -24060,7 +24060,7 @@ const Nn = SillyTavern.getContext(), xh = () => ({
           continueFrom: re,
           session: i,
           allCharacters: y,
-          entriesGroupByWorldName: ze,
+          entriesGroupByWorldName: Pe,
           promptSettings: Ze,
           formatDescription: { content: r.prompts[`${r.outputFormat}Format`].content },
           mainContextList: r.mainContextTemplatePresets[r.mainContextTemplatePreset].prompts.filter(
@@ -24175,7 +24175,7 @@ const Nn = SillyTavern.getContext(), xh = () => ({
     } catch (ne) {
       Ne("error", `Failed to override character: ${ne.message}`);
     }
-  }, Pe = () => {
+  }, Le = () => {
     const P = JSON.stringify({ draftFields: i.draftFields, version: F0 }, null, 2), re = new Blob([P], { type: "application/json" }), ne = document.createElement("a");
     ne.href = URL.createObjectURL(re), ne.download = `crec-draft-fields-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`, ne.click(), URL.revokeObjectURL(ne.href);
   }, Y = () => {
@@ -24615,7 +24615,7 @@ const Nn = SillyTavern.getContext(), xh = () => ({
               /* @__PURE__ */ A.jsx("i", { className: "fa-solid fa-plus" }),
               " Add"
             ] }),
-            /* @__PURE__ */ A.jsx(Se, { onClick: Pe, children: "Export" }),
+            /* @__PURE__ */ A.jsx(Se, { onClick: Le, children: "Export" }),
             /* @__PURE__ */ A.jsx(Se, { onClick: Y, children: "Import" })
           ] }) })
         ] }),

@@ -278,16 +278,19 @@ export const MainPopup: FC = () => {
         // still adds the profile preset's prompts (main, jailbreak, etc.) without any chat messages.
         const includeChatHistory = msgContext.type !== 'none' && (this_chid !== undefined || !!selected_group);
         const entriesGroupByWorldName: Record<string, WIEntry[]> = {};
-        await Promise.all(
-          world_names
-            .filter((name: string) => !entriesGroupByWorldName[name])
-            .map(async (name: string) => {
-              const worldInfo = await globalContext.loadWorldInfo(name);
-              if (worldInfo) {
-                entriesGroupByWorldName[name] = getWorldInfoEntries(worldInfo, { includeDisabled: true });
-              }
-            }),
-        );
+        if (settings.contextToSend.worldInfo) {
+          // Only the selected lorebooks are sent, so don't load the others.
+          await Promise.all(
+            session.selectedWorldNames
+              .filter((name: string) => world_names.includes(name))
+              .map(async (name: string) => {
+                const worldInfo = await globalContext.loadWorldInfo(name);
+                if (worldInfo) {
+                  entriesGroupByWorldName[name] = getWorldInfoEntries(worldInfo, { includeDisabled: true });
+                }
+              }),
+          );
+        }
 
         const promptSettings = structuredClone(settings.prompts);
         if (!settings.contextToSend.stDescription) {
