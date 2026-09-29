@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import { parseResponse } from '../parsers.js';
-import { createGlobalResponseSchema } from '../revise-types.js';
+import { schemaToExample } from '../schema-to-example.js';
+import { createGlobalResponseSchema, FieldSpecificResponseSchema } from '../revise-types.js';
 
 const globalSchema = createGlobalResponseSchema(['description', 'personality', 'draft_1'], ['draft_1']);
 const globalJsonSchema = z.toJSONSchema(globalSchema);
@@ -127,5 +128,35 @@ describe('revise XML parsing with schema', () => {
   test('still rejects malformed XML', () => {
     const xml = '<root><justification>ok</justification><fields_to_change><field>description</field></root>';
     expect(() => parseResponse(xml, 'xml', { schema: globalJsonSchema })).toThrow('Model response is not valid XML');
+  });
+});
+
+describe('revise schema examples', () => {
+  test('JSON example for the global schema passes validation', () => {
+    const example = JSON.parse(schemaToExample(globalJsonSchema, 'json'));
+    expect(example.greetings_to_change[0].index).toBe(1);
+    expect(example.greetings_to_remove).toEqual([1]);
+    expect(globalSchema.safeParse(example).success).toBe(true);
+  });
+
+  test('XML example for the global schema parses and passes validation', () => {
+    const example = schemaToExample(globalJsonSchema, 'xml');
+    parseGlobalXml(`<root>\n${example}\n</root>`);
+  });
+
+  test('examples for the field schema pass validation', () => {
+    const jsonSchema = z.toJSONSchema(FieldSpecificResponseSchema);
+    expect(FieldSpecificResponseSchema.safeParse(JSON.parse(schemaToExample(jsonSchema, 'json'))).success).toBe(true);
+    const xml = `<root>\n${schemaToExample(jsonSchema, 'xml')}\n</root>`;
+    expect(FieldSpecificResponseSchema.safeParse(parseResponse(xml, 'xml', { schema: jsonSchema })).success).toBe(true);
+  });
+
+  test('honors numeric bounds', () => {
+    expect(schemaToExample({ type: 'integer', minimum: 3 }, 'json')).toBe('3');
+    expect(schemaToExample({ type: 'integer', exclusiveMinimum: 0 }, 'json')).toBe('1');
+    expect(schemaToExample({ type: 'integer', exclusiveMinimum: 0.5 }, 'json')).toBe('1');
+    expect(schemaToExample({ type: 'number', exclusiveMinimum: 0 }, 'json')).toBe('1');
+    expect(schemaToExample({ type: 'integer', maximum: -2 }, 'json')).toBe('-2');
+    expect(schemaToExample({ type: 'integer', minimum: -5, maximum: 5 }, 'json')).toBe('0');
   });
 });
