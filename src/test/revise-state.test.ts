@@ -133,6 +133,40 @@ describe('calculateNewState', () => {
     expect(newState.fields.alternate_greetings_2).toEqual(state.fields.alternate_greetings_2);
   });
 
+  test('keeps greeting prompts through change, remove and add', () => {
+    const state = makeState(['One.', 'Two.', 'Three.']);
+    state.fields.alternate_greetings_1.prompt = 'prompt 1';
+    state.fields.alternate_greetings_2.prompt = 'prompt 2';
+    state.fields.alternate_greetings_3.prompt = 'prompt 3';
+
+    const newState = calculateNewState(
+      state,
+      global({
+        greetings_to_change: [{ index: 3, value: 'Three, changed.' }],
+        greetings_to_remove: [1],
+        greetings_to_add: ['Four.'],
+      }),
+      'global',
+    );
+
+    expect(newState.fields.alternate_greetings_1).toEqual({
+      label: 'Alternate Greeting 1',
+      value: 'Two.',
+      prompt: 'prompt 2',
+    });
+    expect(newState.fields.alternate_greetings_2).toEqual({
+      label: 'Alternate Greeting 2',
+      value: 'Three, changed.',
+      prompt: 'prompt 3',
+    });
+    expect(newState.fields.alternate_greetings_3).toEqual({
+      label: 'Alternate Greeting 3',
+      value: 'Four.',
+      prompt: '',
+    });
+    expect(newState.fields.alternate_greetings_4).toBeUndefined();
+  });
+
   test('does not mutate the input state', () => {
     const state = makeState(['Hello.', 'Hi there.']);
     const original = structuredClone(state);

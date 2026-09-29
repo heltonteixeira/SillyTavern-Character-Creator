@@ -23016,7 +23016,7 @@ async function CA(t, r, i, s, o, u, h) {
 const wA = (t) => Object.entries(t.fields).filter(([r]) => r.startsWith("alternate_greetings_")).sort((r, i) => {
   const s = parseInt(r[0].split("_")[2]), o = parseInt(i[0].split("_")[2]);
   return s - o;
-}).map(([, r]) => r.value), AA = (t, r, i, s) => {
+}).map(([, r]) => ({ value: r.value, prompt: r.prompt })), AA = (t, r, i, s) => {
   const o = structuredClone(t);
   if (i === "field" && s) {
     const u = r;
@@ -23034,21 +23034,19 @@ const wA = (t) => Object.entries(t.fields).filter(([r]) => r.startsWith("alterna
     if (u.greetings_to_change?.length) {
       p = !0;
       for (const d of u.greetings_to_change)
-        d.index > 0 && d.index <= h.length && (h[d.index - 1] = d.value);
+        d.index > 0 && d.index <= h.length && (h[d.index - 1].value = d.value);
     }
     if (u.greetings_to_remove?.length) {
       p = !0;
       const d = new Set(u.greetings_to_remove.map((g) => g - 1));
       h = h.filter((g, y) => !d.has(y));
     }
-    u.greetings_to_add?.length && (p = !0, h.push(...u.greetings_to_add)), p && (Object.keys(o.fields).forEach((d) => {
+    u.greetings_to_add?.length && (p = !0, h.push(...u.greetings_to_add.map((d) => ({ value: d, prompt: "" })))), p && (Object.keys(o.fields).forEach((d) => {
       d.startsWith("alternate_greetings_") && delete o.fields[d];
     }), h.forEach((d, g) => {
       const y = `alternate_greetings_${g + 1}`;
       o.fields[y] = {
-        value: d,
-        prompt: "",
-        // Prompts are not managed in revise sessions.
+        ...d,
         label: `Alternate Greeting ${g + 1}`
       };
     }));
