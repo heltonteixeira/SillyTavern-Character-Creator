@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { getPrefilled, parseResponse } from '../parsers.js';
+import { getPrefilled, mergeContinuation, parseResponse } from '../parsers.js';
 
 describe('single-field XML responses', () => {
   test('keeps markup inside <response> verbatim', () => {
@@ -131,5 +131,83 @@ describe('structured (schema) responses', () => {
   test('parses fenced JSON with a schema', () => {
     const input = 'Here you go:\n```json\n{"name": "Ann", "tags": ["a"]}\n```';
     expect(parseResponse(input, 'json', { schema })).toEqual({ name: 'Ann', tags: ['a'] });
+  });
+});
+
+describe('mergeContinuation', () => {
+  const existing = 'She said "hi" from C:\\temp';
+  const ended = 'She said "hi" & <b>left</b>.';
+
+  test('JSON: appends a continuation of the prefill', () => {
+    expect(mergeContinuation(existing, ' and left.\\n\\nMore."\n}', 'json')).toBe(`${existing} and left.\n\nMore.`);
+  });
+
+  test('JSON: an immediately closed prefill keeps the text unchanged', () => {
+    expect(mergeContinuation(existing, '"\n}', 'json')).toBe(existing);
+  });
+
+  test('JSON: appends a fresh response that ignored the prefill', () => {
+    expect(mergeContinuation(existing, '{"response": "Brand new paragraph."}', 'json')).toBe(
+      `${existing} Brand new paragraph.`,
+    );
+    expect(mergeContinuation(ended, '```json\n{"response": "Brand new paragraph."}\n```', 'json')).toBe(
+      `${ended}\n\nBrand new paragraph.`,
+    );
+    expect(mergeContinuation(ended, '{\n  "response": "Raw\nnewline."\n}', 'json')).toBe(`${ended}\n\nRaw\nnewline.`);
+  });
+
+  test('JSON: does not duplicate a fresh response that repeats the text', () => {
+    const reply = JSON.stringify({ response: `${existing} plus more.` });
+    expect(mergeContinuation(existing, reply, 'json')).toBe(`${existing} plus more.`);
+  });
+
+  test('JSON: keeps a trailing backslash', () => {
+    const withBackslash = 'Path C:\\temp\\';
+    expect(mergeContinuation(withBackslash, '"\n}', 'json')).toBe(withBackslash);
+    expect(mergeContinuation(withBackslash, ' done."}', 'json')).toBe(`${withBackslash} done.`);
+    expect(mergeContinuation(withBackslash, '', 'json')).toBe(withBackslash);
+  });
+
+  test('XML: appends a continuation of the prefill', () => {
+    expect(mergeContinuation(ended, ' Then <i>more</i>.]]></response>', 'xml')).toBe(`${ended} Then <i>more</i>.`);
+    expect(mergeContinuation(ended, ' Then more.</response>', 'xml')).toBe(`${ended} Then more.`);
+    expect(mergeContinuation(ended, ']]></response>', 'xml')).toBe(ended);
+  });
+
+  test('XML: appends a fresh response that ignored the prefill', () => {
+    expect(mergeContinuation(ended, '<response><![CDATA[Brand <b>new</b>.]]></response>', 'xml')).toBe(
+      `${ended}\n\nBrand <b>new</b>.`,
+    );
+    expect(mergeContinuation(existing, '<response>Brand new.</response>', 'xml')).toBe(`${existing} Brand new.`);
+    expect(mergeContinuation(ended, `<response><![CDATA[${ended} More.]]></response>`, 'xml')).toBe(`${ended} More.`);
+  });
+
+  test('plain text: appends the reply without duplicating repeated text', () => {
+    expect(mergeContinuation(existing, ' and left.', 'none')).toBe(`${existing} and left.`);
+    expect(mergeContinuation(existing, '', 'none')).toBe(existing);
+    expect(mergeContinuation(existing, `${existing} and left.`, 'none')).toBe(`${existing} and left.`);
+  });
+
+  test('always keeps the existing text', () => {
+    const cases: [string, 'xml' | 'json' | 'none'][] = [
+      ['{"response": "New."}', 'json'],
+      ['```json\n{"response": "New."}\n```', 'json'],
+      ['{"response": ""}', 'json'],
+      [' more."}\n{"response": "Other."}', 'json'],
+      [' more.", "response": "Other."}', 'json'],
+      ['"\n}', 'json'],
+      ['', 'json'],
+      ['<response>New.</response>', 'xml'],
+      ['<response></response>', 'xml'],
+      ['', 'xml'],
+      ['New.', 'none'],
+      ['\nmore\n```', 'none'],
+      ['```\nNew.\n```', 'none'],
+    ];
+    for (const text of [existing, ended, '```\ncode', 'Ends with \\', 'Ends with ]]']) {
+      for (const [reply, format] of cases) {
+        expect(mergeContinuation(`  ${text}\n`, reply, format).startsWith(text), `${format}: ${reply}`).toBe(true);
+      }
+    }
   });
 });

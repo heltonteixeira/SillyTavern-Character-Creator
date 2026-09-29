@@ -287,3 +287,64 @@ export function getPrefilled(content: string, format: 'xml' | 'json' | 'none'): 
       throw new Error(`Unsupported format specified: ${format}`);
   }
 }
+
+const jsonResponseStartRegex = /^\{\s*"response"\s*:/;
+
+/**
+ * Checks if a reply to a continue request is a complete response of its own, i.e. the model ignored the prefill.
+ */
+function isCompleteResponse(reply: string, existing: string, format: 'xml' | 'json' | 'none'): boolean {
+  switch (format) {
+    case 'xml':
+      return responseOpenTagRegex.test(reply);
+    case 'json':
+      return (
+        jsonResponseStartRegex.test(reply.trim()) ||
+        Array.from(reply.matchAll(codeBlockRegex)).some((match) => jsonResponseStartRegex.test(match[1].trim()))
+      );
+    case 'none':
+      // No structure to detect, only a reply that repeats the existing text.
+      return reply.trim().startsWith(existing);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Separator between the existing text and a separately written continuation (both trimmed):
+ * a blank line after the end of a sentence (`.`, `!`, `?`, `…`, a closing quote or bracket, or `*` closing an action),
+ * otherwise a single space.
+ */
+function getContinuationJoiner(existing: string, addition: string): string {
+  if (!existing || !addition) {
+    return '';
+  }
+  return /[.!?…"'”’»)\]*]$/.test(existing) ? '\n\n' : ' ';
+}
+
+/**
+ * Merges the model's reply to a continue request (sent with the `getPrefilled` prefill) into the existing text.
+ * The result always starts with the existing text.
+ * @param existing The text that was continued
+ * @param reply The model's reply
+ * @param format The expected format ('xml', 'json', 'none')
+ * @returns The continued text
+ */
+export function mergeContinuation(existing: string, reply: string, format: 'xml' | 'json' | 'none'): string {
+  const trimmedExisting = existing.trim();
+
+  if (!isCompleteResponse(reply, trimmedExisting, format)) {
+    // The model continued the prefill
+    const continued = String(parseResponse(getPrefilled(existing, format) + reply, format));
+    if (continued.startsWith(trimmedExisting)) {
+      return continued;
+    }
+  }
+
+  // The model wrote a response of its own. Keep it as is if it repeats the existing text, otherwise append it.
+  const newText = String(parseResponse(reply, format));
+  if (newText.startsWith(trimmedExisting)) {
+    return newText;
+  }
+  return trimmedExisting + getContinuationJoiner(trimmedExisting, newText) + newText;
+}
