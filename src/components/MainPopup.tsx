@@ -276,9 +276,9 @@ export const MainPopup: FC = () => {
           default:
             break;
         }
-        if (this_chid === undefined && !selected_group) {
-          buildPromptOptions.messageIndexesBetween = { start: -1, end: -1 };
-        }
+        // Like the revise session, skip the chat history block when no messages are sent. Otherwise buildPrompt
+        // still adds the profile preset's prompts (main, jailbreak, etc.) without any chat messages.
+        const includeChatHistory = msgContext.type !== 'none' && (this_chid !== undefined || !!selected_group);
         const entriesGroupByWorldName: Record<string, WIEntry[]> = {};
         await Promise.all(
           world_names
@@ -326,7 +326,7 @@ export const MainPopup: FC = () => {
           promptSettings,
           formatDescription: { content: settings.prompts[`${settings.outputFormat}Format`].content },
           mainContextList: settings.mainContextTemplatePresets[settings.mainContextTemplatePreset].prompts.filter(
-            (p) => p.enabled,
+            (p) => p.enabled && (includeChatHistory || p.promptName !== 'chatHistory'),
           ),
           includeUserMacro: settings.contextToSend.persona,
           maxResponseToken: settings.maxResponseToken,
