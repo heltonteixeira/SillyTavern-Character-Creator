@@ -24,7 +24,17 @@ function ensureArray(data: any, schema: any) {
 
     // Ensure the property is an array if the schema requires it and it's not one already.
     if (propSchema.type === 'array' && !Array.isArray(propData)) {
-      propData = [propData];
+      // Unwrap <item> wrappers, e.g. <list><item>a</item><item>b</item></list>.
+      if (
+        typeof propData === 'object' &&
+        propData !== null &&
+        Object.keys(propData).length === 1 &&
+        'item' in propData &&
+        !propSchema.items?.properties?.item
+      ) {
+        propData = propData.item;
+      }
+      propData = Array.isArray(propData) ? propData : [propData];
       data[key] = propData;
     }
 
@@ -42,6 +52,14 @@ function ensureArray(data: any, schema: any) {
       data[key] = propData.map(String);
     }
   }
+}
+
+// Escapes `&` that doesn't start an entity, leaving CDATA sections untouched.
+function escapeBareAmpersands(xml: string): string {
+  return xml
+    .split(/(<!\[CDATA\[[\s\S]*?\]\]>)/)
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(/&(?!(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;')))
+    .join('');
 }
 
 function extractLastCodeBlock(content: string): string | null {
@@ -93,6 +111,7 @@ export function parseResponse(
         // The validator is too strict for partial content, so we bypass it in those cases.
         // A simple heuristic: if it doesn't end with the closing root tag, it's likely partial.
         if (options.schema) {
+          cleanedContent = escapeBareAmpersands(cleanedContent);
           const validationResult = XMLValidator.validate(cleanedContent);
           if (validationResult !== true) {
             throw new Error(`Model response is not valid XML: ${validationResult.err.msg}`);
