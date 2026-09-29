@@ -137,6 +137,86 @@ describe('revise XML parsing with schema', () => {
     const xml = '<root><justification>ok</justification><fields_to_change><field>description</field></root>';
     expect(() => parseResponse(xml, 'xml', { schema: globalJsonSchema })).toThrow('Model response is not valid XML');
   });
+
+  test('keeps number-like strings verbatim', () => {
+    const xml =
+      '<root><justification>007</justification>' +
+      '<fields_to_change><field>description</field><value>1.50</value></fields_to_change>' +
+      '<fields_to_change><field>personality</field><value><![CDATA[ 1e3 ]]></value></fields_to_change>' +
+      '<greetings_to_add>  0012  </greetings_to_add>' +
+      '<greetings_to_change><index> 2 </index><value>1e3</value></greetings_to_change>' +
+      '</root>';
+
+    expect(parseGlobalXml(xml)).toEqual({
+      justification: '007',
+      fields_to_change: [
+        { field: 'description', value: '1.50' },
+        { field: 'personality', value: ' 1e3 ' },
+      ],
+      greetings_to_add: ['0012'],
+      greetings_to_change: [{ index: 2, value: '1e3' }],
+    });
+  });
+
+  test('coerces numbers and booleans per schema', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        count: { type: 'integer' },
+        ratio: { type: 'number' },
+        flag: { type: 'boolean' },
+        ids: { type: 'array', items: { type: 'integer' } },
+        bad: { type: 'integer' },
+      },
+    };
+    const xml =
+      '<root><count><![CDATA[2]]></count><ratio>1e3</ratio><flag>true</flag>' +
+      '<ids><item>1</item><item>02</item></ids><bad>two</bad></root>';
+
+    expect(parseResponse(xml, 'xml', { schema })).toEqual({
+      count: 2,
+      ratio: 1000,
+      flag: true,
+      ids: [1, 2],
+      bad: 'two',
+    });
+  });
+
+  test('treats empty list tags as empty lists', () => {
+    const xml =
+      '<root><justification>x</justification>' +
+      '<fields_to_change></fields_to_change>' +
+      '<draft_fields_to_remove><item/></draft_fields_to_remove>' +
+      '<greetings_to_add/>' +
+      '<greetings_to_remove></greetings_to_remove>' +
+      '<greetings_to_change>\n  </greetings_to_change>' +
+      '</root>';
+
+    expect(parseGlobalXml(xml)).toEqual({
+      justification: 'x',
+      fields_to_change: [],
+      draft_fields_to_remove: [],
+      greetings_to_add: [],
+      greetings_to_remove: [],
+      greetings_to_change: [],
+    });
+  });
+
+  test('drops empty repeated list elements but keeps empty values inside items', () => {
+    const xml =
+      '<root><justification>x</justification>' +
+      '<fields_to_change><field>description</field><value></value></fields_to_change>' +
+      '<fields_to_change></fields_to_change>' +
+      '<greetings_to_add></greetings_to_add>' +
+      '<greetings_to_add>Hi</greetings_to_add>' +
+      '</root>';
+
+    expect(parseGlobalXml(xml)).toEqual({
+      justification: 'x',
+      fields_to_change: [{ field: 'description', value: '' }],
+      greetings_to_add: ['Hi'],
+    });
+  });
 });
 
 describe('revise schema examples', () => {

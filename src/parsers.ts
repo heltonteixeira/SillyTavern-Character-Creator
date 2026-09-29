@@ -7,8 +7,31 @@ const xmlParser = new XMLParser({
   allowBooleanAttributes: true,
 });
 
+// Keeps tag values as strings so they can be coerced per schema (e.g. "007" stays "007" for string fields).
+const schemaXmlParser = new XMLParser({
+  ignoreAttributes: true,
+  textNodeName: '#text',
+  trimValues: true,
+  allowBooleanAttributes: true,
+  parseTagValue: false,
+});
+
 export interface ParseOptions {
   schema?: any;
+}
+
+function coerceValue(value: any, schema: any): any {
+  if (schema?.type === 'string' && typeof value !== 'string') {
+    return String(value);
+  }
+  if ((schema?.type === 'integer' || schema?.type === 'number') && typeof value === 'string' && value.trim() !== '') {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : value;
+  }
+  if (schema?.type === 'boolean' && (value === 'true' || value === 'false')) {
+    return value === 'true';
+  }
+  return value;
 }
 
 function ensureArray(data: any, schema: any) {
@@ -35,6 +58,10 @@ function ensureArray(data: any, schema: any) {
         propData = propData.item;
       }
       propData = Array.isArray(propData) ? propData : [propData];
+    }
+    if (propSchema.type === 'array') {
+      // An empty tag (e.g. <list></list> or <list/>) means an empty list, not a list with an empty item.
+      propData = propData.filter((item: any) => item !== '');
       data[key] = propData;
     }
 
@@ -46,10 +73,10 @@ function ensureArray(data: any, schema: any) {
     }
 
     // Coerce types to match schema, for both single properties and items within an array.
-    if (propSchema.type === 'string' && typeof propData !== 'string') {
-      data[key] = String(propData);
-    } else if (propSchema.type === 'array' && propSchema.items?.type === 'string' && Array.isArray(propData)) {
-      data[key] = propData.map(String);
+    if (propSchema.type === 'array') {
+      data[key] = propData.map((item: any) => coerceValue(item, propSchema.items));
+    } else {
+      data[key] = coerceValue(propData, propSchema);
     }
   }
 }
@@ -117,7 +144,7 @@ export function parseResponse(
             throw new Error(`Model response is not valid XML: ${validationResult.err.msg}`);
           }
         }
-        let parsedXml = xmlParser.parse(cleanedContent);
+        let parsedXml = (options.schema ? schemaXmlParser : xmlParser).parse(cleanedContent);
         if (parsedXml.root) {
           parsedXml = parsedXml.root;
         } else if (parsedXml.response) {
