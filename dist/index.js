@@ -19247,7 +19247,8 @@ const HE = SillyTavern.getContext(), Li = ({
         ...M.prompts,
         [i]: {
           ...M.prompts[i],
-          content: tt[i]
+          content: tt[i],
+          isDefault: !0
         }
       };
     });
