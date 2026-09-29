@@ -161,6 +161,23 @@ describe('mergeContinuation', () => {
     expect(mergeContinuation(existing, reply, 'json')).toBe(`${existing} plus more.`);
   });
 
+  test('closing-only replies add no text', () => {
+    const text = 'The toys folded into games.';
+    for (const reply of ['}', '"}', '"\n}', ' }', '" }', '"}\n```', '', '  ']) {
+      expect(mergeContinuation(text, reply, 'json'), JSON.stringify(reply)).toBe(text);
+    }
+    for (const reply of [']]></response>', '</response>', ']]>', ' ]]>\n</response>\n```']) {
+      expect(mergeContinuation(text, reply, 'xml'), JSON.stringify(reply)).toBe(text);
+    }
+  });
+
+  test('JSON: text ending with braces is not closing-only', () => {
+    expect(mergeContinuation('She waves.', ' And greets {{user}}', 'json')).toBe('She waves. And greets {{user}}');
+    expect(mergeContinuation('She waves.', ' And greets {{user}}"}', 'json')).toBe('She waves. And greets {{user}}');
+    expect(mergeContinuation('She greets {{user}}', '"}', 'json')).toBe('She greets {{user}}');
+    expect(mergeContinuation('She greets {{user}}', '}', 'json')).toBe('She greets {{user}}');
+  });
+
   test('JSON: keeps a trailing backslash', () => {
     const withBackslash = 'Path C:\\temp\\';
     expect(mergeContinuation(withBackslash, '"\n}', 'json')).toBe(withBackslash);

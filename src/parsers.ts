@@ -335,6 +335,11 @@ export function getPrefilled(content: string, format: 'xml' | 'json' | 'none'): 
 }
 
 const jsonResponseStartRegex = /^\{\s*"response"\s*:/;
+// Replies that only close the prefilled structure, i.e. add no text
+const closingOnlyRegex: Record<'xml' | 'json', RegExp> = {
+  json: /^[\s"}]*(?:```\s*)?$/,
+  xml: /^\s*(?:]]>)?\s*(?:<\/response>)?\s*(?:```\s*)?$/,
+};
 
 /**
  * Checks if a reply to a continue request is a complete response of its own, i.e. the model ignored the prefill.
@@ -378,6 +383,10 @@ function getContinuationJoiner(existing: string, addition: string): string {
  */
 export function mergeContinuation(existing: string, reply: string, format: 'xml' | 'json' | 'none'): string {
   const trimmedExisting = existing.trim();
+
+  if (format !== 'none' && closingOnlyRegex[format].test(reply)) {
+    return trimmedExisting;
+  }
 
   if (!isCompleteResponse(reply, trimmedExisting, format)) {
     // The model continued the prefill
