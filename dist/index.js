@@ -18203,7 +18203,7 @@ async function UE() {
                 }
               },
               // Generic Prompt Presets
-              promptPreset: i?.default ?? "default",
+              promptPreset: i?.promptPreset ?? "default",
               promptPresets: i?.promptPresets ?? {
                 default: {
                   content: "Generate the field content based on the chat history and existing character details. Be creative but consistent."

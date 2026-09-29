@@ -441,7 +441,7 @@ export async function initializeSettings(): Promise<void> {
                 },
 
                 // Generic Prompt Presets
-                promptPreset: previous?.default ?? 'default',
+                promptPreset: previous?.promptPreset ?? 'default',
                 promptPresets: previous?.promptPresets ?? {
                   default: {
                     content:
