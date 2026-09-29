@@ -23024,13 +23024,13 @@ const wA = (t) => Object.entries(t.fields).filter(([r]) => r.startsWith("alterna
   }
   if (i === "global") {
     const u = r;
-    let h = wA(o), p = !1;
     if (u.fields_to_change?.length)
       for (const d of u.fields_to_change)
         o.fields[d.field] ? o.fields[d.field].value = d.value : o.draftFields[d.field] && (o.draftFields[d.field].value = d.value);
     if (u.draft_fields_to_remove?.length)
       for (const d of u.draft_fields_to_remove)
         o.draftFields[d] && delete o.draftFields[d];
+    let h = wA(o), p = !1;
     if (u.greetings_to_change?.length) {
       p = !0;
       for (const d of u.greetings_to_change)

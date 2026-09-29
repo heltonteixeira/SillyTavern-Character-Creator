@@ -30,8 +30,6 @@ export const calculateNewState = (
 
   if (sessionType === 'global') {
     const res = response as GlobalResponse;
-    let currentGreetings = getGreetings(newState);
-    let greetingsModified = false;
 
     if (res.fields_to_change?.length) {
       for (const change of res.fields_to_change) {
@@ -52,6 +50,11 @@ export const calculateNewState = (
         }
       }
     }
+
+    // Snapshot the greetings after `fields_to_change`, so edits to `alternate_greetings_N` fields are kept.
+    // Indices in the greeting operations refer to the numbering the AI saw; change runs first, then remove, then add.
+    let currentGreetings = getGreetings(newState);
+    let greetingsModified = false;
 
     if (res.greetings_to_change?.length) {
       greetingsModified = true;
