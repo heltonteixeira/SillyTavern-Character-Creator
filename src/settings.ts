@@ -17,11 +17,11 @@ import {
   DEFAULT_REVISE_TASK_DESCRIPTION,
 } from './constants.js';
 import { globalContext } from './generate.js';
-import { migrateSettings } from './settings-migration.js';
+import { migrateSettings, updateDefaultPrompts } from './settings-migration.js';
 
 export const extensionName = 'SillyTavern-Character-Creator';
 export const VERSION = '0.3.0';
-export const FORMAT_VERSION = 'F_1.10';
+export const FORMAT_VERSION = 'F_1.11';
 
 export const KEYS = {
   EXTENSION: 'charCreator',
@@ -695,6 +695,20 @@ export async function initializeSettings(): Promise<void> {
               }
 
               return response;
+            },
+          },
+          {
+            from: 'F_1.10',
+            to: 'F_1.11',
+            action(previous: ExtensionSettings): ExtensionSettings {
+              // Update the changed prompts if they were default
+              return updateDefaultPrompts(previous, {
+                stDescription: DEFAULT_CHAR_CARD_DESCRIPTION,
+                xmlFormat: DEFAULT_XML_FORMAT_DESC,
+                jsonFormat: DEFAULT_JSON_FORMAT_DESC,
+                noneFormat: DEFAULT_NONE_FORMAT_DESC,
+                reviseXmlPrompt: DEFAULT_REVISE_XML_PROMPT,
+              });
             },
           },
         ]),

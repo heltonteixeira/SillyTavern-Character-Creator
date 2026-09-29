@@ -43,3 +43,20 @@ export async function migrateSettings<T extends { formatVersion: string }>(
     current = migration.to;
   }
 }
+
+/**
+ * Sets each prompt in `defaults` to its new default content, unless the user edited it (`isDefault` is false).
+ * Returns an updated copy, `settings` is not modified.
+ */
+export function updateDefaultPrompts<T extends { prompts: Record<string, any> }>(
+  settings: T,
+  defaults: Record<string, string>,
+): T {
+  const prompts = { ...settings.prompts };
+  for (const [key, content] of Object.entries(defaults)) {
+    if (prompts[key]?.isDefault) {
+      prompts[key] = { ...prompts[key], content };
+    }
+  }
+  return { ...settings, prompts };
+}

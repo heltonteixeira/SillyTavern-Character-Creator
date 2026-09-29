@@ -1,5 +1,17 @@
 import { describe, expect, test } from 'vitest';
-import { compareFormatVersions, migrateSettings, SettingsMigration } from '../settings-migration.js';
+import {
+  DEFAULT_CHAR_CARD_DESCRIPTION,
+  DEFAULT_JSON_FORMAT_DESC,
+  DEFAULT_NONE_FORMAT_DESC,
+  DEFAULT_REVISE_XML_PROMPT,
+  DEFAULT_XML_FORMAT_DESC,
+} from '../constants.js';
+import {
+  compareFormatVersions,
+  migrateSettings,
+  SettingsMigration,
+  updateDefaultPrompts,
+} from '../settings-migration.js';
 
 const migrations: SettingsMigration[] = [
   { from: '*', to: 'F_1.4', action: (previous) => ({ ...previous, steps: ['* -> F_1.4'] }) },
@@ -39,5 +51,82 @@ describe('settings migration', () => {
       formatVersion: 'F_1.10',
       steps: ['* -> F_1.4', 'F_1.4 -> F_1.9', 'F_1.9 -> F_1.10'],
     });
+  });
+});
+
+describe('updating default prompts (F_1.10 -> F_1.11)', () => {
+  const newDefaults = {
+    stDescription: DEFAULT_CHAR_CARD_DESCRIPTION,
+    xmlFormat: DEFAULT_XML_FORMAT_DESC,
+    jsonFormat: DEFAULT_JSON_FORMAT_DESC,
+    noneFormat: DEFAULT_NONE_FORMAT_DESC,
+    reviseXmlPrompt: DEFAULT_REVISE_XML_PROMPT,
+  };
+  const f1_11: SettingsMigration = {
+    from: 'F_1.10',
+    to: 'F_1.11',
+    action: (previous) => updateDefaultPrompts(previous, newDefaults),
+  };
+  const f1_10: SettingsMigration = {
+    from: 'F_1.9',
+    to: 'F_1.10',
+    action: (previous) => ({ ...previous, steps: [...(previous.steps ?? []), 'F_1.9 -> F_1.10'] }),
+  };
+
+  const makeSettings = (formatVersion: string) => ({
+    formatVersion,
+    prompts: {
+      stDescription: { label: 'ST', content: 'old default', isDefault: true },
+      xmlFormat: { label: 'XML', content: 'old default', isDefault: true },
+      jsonFormat: { label: 'JSON', content: 'my custom JSON format', isDefault: false },
+      noneFormat: { label: 'None', content: 'old default', isDefault: true },
+      reviseXmlPrompt: { label: 'Revise XML', content: 'my custom revise prompt', isDefault: false },
+      taskDescription: { label: 'Task', content: 'task', isDefault: true },
+    },
+  });
+
+  test('updates default prompts and keeps edited ones', () => {
+    const settings = makeSettings('F_1.10');
+    const result = updateDefaultPrompts(settings, newDefaults);
+
+    expect(result.prompts.stDescription).toEqual({
+      label: 'ST',
+      content: DEFAULT_CHAR_CARD_DESCRIPTION,
+      isDefault: true,
+    });
+    expect(result.prompts.xmlFormat.content).toBe(DEFAULT_XML_FORMAT_DESC);
+    expect(result.prompts.noneFormat.content).toBe(DEFAULT_NONE_FORMAT_DESC);
+    expect(result.prompts.jsonFormat).toEqual(settings.prompts.jsonFormat);
+    expect(result.prompts.reviseXmlPrompt).toEqual(settings.prompts.reviseXmlPrompt);
+    expect(result.prompts.taskDescription).toEqual(settings.prompts.taskDescription);
+    // The input is not modified
+    expect(settings).toEqual(makeSettings('F_1.10'));
+  });
+
+  test('skips prompts that are missing', () => {
+    const result = updateDefaultPrompts({ prompts: {} as Record<string, any> }, newDefaults);
+    expect(result.prompts).toEqual({});
+  });
+
+  test('migrates from F_1.10 to F_1.11', async () => {
+    const result = await migrateSettings(makeSettings('F_1.10'), [f1_10, f1_11]);
+
+    expect(result?.formatVersion).toBe('F_1.11');
+    expect(result?.prompts.xmlFormat.content).toBe(DEFAULT_XML_FORMAT_DESC);
+    expect(result?.prompts.jsonFormat.content).toBe('my custom JSON format');
+    expect((result as any).steps).toBeUndefined();
+  });
+
+  test('migrates from F_1.9 through F_1.10 to F_1.11', async () => {
+    const result = await migrateSettings(makeSettings('F_1.9'), [f1_10, f1_11]);
+
+    expect(result?.formatVersion).toBe('F_1.11');
+    expect((result as any).steps).toEqual(['F_1.9 -> F_1.10']);
+    expect(result?.prompts.stDescription.content).toBe(DEFAULT_CHAR_CARD_DESCRIPTION);
+    expect(result?.prompts.reviseXmlPrompt.content).toBe('my custom revise prompt');
+  });
+
+  test('does nothing at F_1.11', async () => {
+    expect(await migrateSettings(makeSettings('F_1.11'), [f1_10, f1_11])).toBeUndefined();
   });
 });
