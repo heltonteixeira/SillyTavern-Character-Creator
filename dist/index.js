@@ -23124,7 +23124,48 @@ async function IA(t, r, i, s, o, u, f) {
   }
   return _.data;
 }
-const O1 = ({ originalContent: t, newContent: r }) => {
+const BA = (t) => Object.entries(t.fields).filter(([r]) => r.startsWith("alternate_greetings_")).sort((r, i) => {
+  const s = parseInt(r[0].split("_")[2]), o = parseInt(i[0].split("_")[2]);
+  return s - o;
+}).map(([, r]) => r.value), UA = (t, r, i, s) => {
+  const o = structuredClone(t);
+  if (i === "field" && s) {
+    const u = r;
+    return o.fields[s] && (o.fields[s].value = u.response), o;
+  }
+  if (i === "global") {
+    const u = r;
+    if (u.fields_to_change?.length)
+      for (const d of u.fields_to_change)
+        o.fields[d.field] ? o.fields[d.field].value = d.value : o.draftFields[d.field] && (o.draftFields[d.field].value = d.value);
+    if (u.draft_fields_to_remove?.length)
+      for (const d of u.draft_fields_to_remove)
+        o.draftFields[d] && delete o.draftFields[d];
+    let f = BA(o), p = !1;
+    if (u.greetings_to_change?.length) {
+      p = !0;
+      for (const d of u.greetings_to_change)
+        d.index > 0 && d.index <= f.length && (f[d.index - 1] = d.value);
+    }
+    if (u.greetings_to_remove?.length) {
+      p = !0;
+      const d = new Set(u.greetings_to_remove.map((g) => g - 1));
+      f = f.filter((g, y) => !d.has(y));
+    }
+    u.greetings_to_add?.length && (p = !0, f.push(...u.greetings_to_add)), p && (Object.keys(o.fields).forEach((d) => {
+      d.startsWith("alternate_greetings_") && delete o.fields[d];
+    }), f.forEach((d, g) => {
+      const y = `alternate_greetings_${g + 1}`;
+      o.fields[y] = {
+        value: d,
+        prompt: "",
+        // Prompts are not managed in revise sessions.
+        label: `Alternate Greeting ${g + 1}`
+      };
+    }));
+  }
+  return o;
+}, O1 = ({ originalContent: t, newContent: r }) => {
   const i = ee.useMemo(() => {
     const s = e1(t, r);
     let o = "", u = "";
@@ -23137,7 +23178,7 @@ const O1 = ({ originalContent: t, newContent: r }) => {
     /* @__PURE__ */ T.jsx("div", { className: "content", dangerouslySetInnerHTML: { __html: i.originalHtml } }),
     /* @__PURE__ */ T.jsx("div", { className: "content", dangerouslySetInnerHTML: { __html: i.newHtml } })
   ] });
-}, BA = ({ before: t, after: r }) => {
+}, HA = ({ before: t, after: r }) => {
   const i = ee.useMemo(() => {
     const s = [];
     return (/* @__PURE__ */ new Set([...Object.keys(t.fields), ...Object.keys(r.fields)])).forEach((u) => {
@@ -23160,7 +23201,7 @@ const O1 = ({ originalContent: t, newContent: r }) => {
       /* @__PURE__ */ T.jsx(O1, { originalContent: o, newContent: u })
     ] }, s)) })
   ] });
-}, UA = ({ currentState: t, initialState: r }) => {
+}, qA = ({ currentState: t, initialState: r }) => {
   const [i, s] = ee.useState(!1), { coreFields: o, alternateGreetings: u } = ee.useMemo(() => {
     const p = [], d = [];
     return Jn.forEach((g) => {
@@ -23210,48 +23251,7 @@ const O1 = ({ originalContent: t, newContent: r }) => {
       ] })
     ] }) })
   ] });
-}, Mi = SillyTavern.getContext(), HA = (t) => Object.entries(t.fields).filter(([r]) => r.startsWith("alternate_greetings_")).sort((r, i) => {
-  const s = parseInt(r[0].split("_")[2]), o = parseInt(i[0].split("_")[2]);
-  return s - o;
-}).map(([, r]) => r.value), qA = (t, r, i, s) => {
-  const o = structuredClone(t);
-  if (i === "field" && s) {
-    const u = r;
-    return o.fields[s] && (o.fields[s].value = u.response), o;
-  }
-  if (i === "global") {
-    const u = r;
-    let f = HA(o), p = !1;
-    if (u.fields_to_change?.length)
-      for (const d of u.fields_to_change)
-        o.fields[d.field] ? o.fields[d.field].value = d.value : o.draftFields[d.field] && (o.draftFields[d.field].value = d.value);
-    if (u.draft_fields_to_remove?.length)
-      for (const d of u.draft_fields_to_remove)
-        o.draftFields[d] && delete o.draftFields[d];
-    if (u.greetings_to_change?.length) {
-      p = !0;
-      for (const d of u.greetings_to_change)
-        d.index > 0 && d.index <= f.length && (f[d.index - 1] = d.value);
-    }
-    if (u.greetings_to_remove?.length) {
-      p = !0;
-      const d = new Set(u.greetings_to_remove.map((g) => g - 1));
-      f = f.filter((g, y) => !d.has(y));
-    }
-    u.greetings_to_add?.length && (p = !0, f.push(...u.greetings_to_add)), p && (Object.keys(o.fields).forEach((d) => {
-      d.startsWith("alternate_greetings_") && delete o.fields[d];
-    }), f.forEach((d, g) => {
-      const y = `alternate_greetings_${g + 1}`;
-      o.fields[y] = {
-        value: d,
-        prompt: "",
-        // Prompts are not managed in revise sessions.
-        label: `Alternate Greeting ${g + 1}`
-      };
-    }));
-  }
-  return o;
-}, FA = ({ initialState: t, onSave: r, onClose: i }) => {
+}, Mi = SillyTavern.getContext(), FA = ({ initialState: t, onSave: r, onClose: i }) => {
   const [s, o] = ee.useState(() => structuredClone(t)), u = (_, b, v) => {
     const h = structuredClone(s), S = v ? "draftFields" : "fields";
     h[S][_] && (h[S][_].value = b), o(h);
@@ -23429,7 +23429,7 @@ const O1 = ({ originalContent: t, newContent: r }) => {
             t.promptEngineeringMode,
             at.maxResponseToken,
             k.current.signal
-          ), Xe = qA(ne, Me, t.type, t.targetFieldId), he = {
+          ), Xe = UA(ne, Me, t.type, t.targetFieldId), he = {
             id: `msg-${Date.now()}-ai`,
             role: "assistant",
             content: Me.justification,
@@ -23716,7 +23716,7 @@ const O1 = ({ originalContent: t, newContent: r }) => {
       Li,
       {
         type: vn.DISPLAY,
-        content: /* @__PURE__ */ T.jsx(BA, { before: b.before, after: b.after }),
+        content: /* @__PURE__ */ T.jsx(HA, { before: b.before, after: b.after }),
         onComplete: () => v(null),
         options: { wide: !0, large: !0 }
       }
@@ -23725,7 +23725,7 @@ const O1 = ({ originalContent: t, newContent: r }) => {
       Li,
       {
         type: vn.DISPLAY,
-        content: /* @__PURE__ */ T.jsx(UA, { currentState: ae, initialState: o }),
+        content: /* @__PURE__ */ T.jsx(qA, { currentState: ae, initialState: o }),
         onComplete: () => S(!1),
         options: { wide: !0, large: !0 }
       }
