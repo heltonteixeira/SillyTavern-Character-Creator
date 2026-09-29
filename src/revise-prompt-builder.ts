@@ -1,4 +1,5 @@
 import { protectMacros, renderPrompt } from './prompt-render.js';
+import { buildFieldList } from './field-list.js';
 import { CharacterState, ReviseMessage, CHAT_HISTORY_PLACEHOLDER_ID } from './revise-types.js';
 import { ExtensionSettings, settingsManager } from './settings.js';
 import { Session, globalContext } from './generate.js';
@@ -45,6 +46,8 @@ export async function buildInitialReviseMessages(
       ),
       draft: Object.fromEntries(Object.entries(initialState.draftFields).map(([, v]) => [v.label, v.value])),
     }),
+    // Every field with its ID and label, see FieldListItem in field-list.ts
+    fieldList: protectMacros(buildFieldList(initialState.fields, initialState.draftFields)),
   };
 
   // Populate templateData with characters and lorebooks for handlebars evaluation, respecting contextToSend settings.
@@ -128,7 +131,12 @@ export async function buildInitialReviseMessages(
   const taskDescriptionTemplate = settings.prompts.reviseTaskDescription.content;
   const taskDescription = renderPrompt(
     taskDescriptionTemplate,
-    { ...templateData, isFieldSession: !!targetFieldId, targetLabel: protectMacros(targetLabel) },
+    {
+      ...templateData,
+      isFieldSession: !!targetFieldId,
+      targetField: targetFieldId,
+      targetLabel: protectMacros(targetLabel),
+    },
     globalContext.substituteParams,
   );
 
