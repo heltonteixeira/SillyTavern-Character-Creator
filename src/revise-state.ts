@@ -97,3 +97,18 @@ export const calculateNewState = (
   }
   return newState;
 };
+
+/**
+ * Applies the final state of a revise session to the main session. Core fields are merged, while alternate greetings
+ * and draft fields are taken exactly as the revise session left them, so ones it removed don't come back.
+ */
+export const applyReviseState = <T extends CharacterState>(prev: T, newState: CharacterState): T => {
+  const fields = Object.fromEntries(
+    Object.entries(prev.fields).filter(([key]) => !key.startsWith('alternate_greetings_')),
+  );
+  return {
+    ...prev,
+    fields: { ...fields, ...newState.fields },
+    draftFields: { ...newState.draftFields },
+  };
+};

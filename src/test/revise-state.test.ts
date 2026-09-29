@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { calculateNewState } from '../revise-state.js';
+import { applyReviseState, calculateNewState } from '../revise-state.js';
 import type { CharacterState, GlobalResponse } from '../revise-types.js';
 
 const makeState = (greetings: string[]): CharacterState => {
@@ -187,5 +187,52 @@ describe('calculateNewState', () => {
     );
 
     expect(state).toEqual(original);
+  });
+});
+
+describe('applyReviseState', () => {
+  const makeSession = (greetings: string[]) => ({
+    ...makeState(greetings),
+    selectedCharacterIndexes: ['3'],
+    selectedWorldNames: ['World'],
+    lastLoadedCharacterId: '3',
+  });
+
+  test('drops greetings removed by the revise session without leaving stale keys', () => {
+    const prev = makeSession(['One.', 'Two.', 'Three.']);
+    const newState = calculateNewState(prev, global({ greetings_to_remove: [1] }), 'global');
+
+    const applied = applyReviseState(prev, newState);
+
+    expect(getGreetingFields(applied)).toEqual([
+      { key: 'alternate_greetings_1', label: 'Alternate Greeting 1', value: 'Two.' },
+      { key: 'alternate_greetings_2', label: 'Alternate Greeting 2', value: 'Three.' },
+    ]);
+  });
+
+  test('drops draft fields removed by the revise session', () => {
+    const prev = makeSession([]);
+    const newState = calculateNewState(prev, global({ draft_fields_to_remove: ['goals'] }), 'global');
+
+    const applied = applyReviseState(prev, newState);
+
+    expect(applied.draftFields).toEqual({ backstory: prev.draftFields.backstory });
+  });
+
+  test('merges core fields and keeps other session properties', () => {
+    const prev = makeSession(['Hello.']);
+    const newState = structuredClone({ fields: prev.fields, draftFields: prev.draftFields });
+    newState.fields.description.value = 'A reckless scout.';
+    delete newState.fields.name;
+
+    const applied = applyReviseState(prev, newState);
+
+    expect(applied.fields.description.value).toBe('A reckless scout.');
+    expect(applied.fields.name).toEqual(prev.fields.name);
+    expect(applied.fields.alternate_greetings_1).toEqual(prev.fields.alternate_greetings_1);
+    expect(applied.selectedCharacterIndexes).toEqual(['3']);
+    expect(applied.selectedWorldNames).toEqual(['World']);
+    expect(applied.lastLoadedCharacterId).toBe('3');
+    expect(prev.fields.description.value).toBe('A careful scout.');
   });
 });
