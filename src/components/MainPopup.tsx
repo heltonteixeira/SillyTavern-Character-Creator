@@ -14,8 +14,6 @@ import { selected_group, st_echo, this_chid, world_names } from 'sillytavern-uti
 import { POPUP_TYPE } from 'sillytavern-utils-lib/types/popup';
 import { Character, FullExportData } from 'sillytavern-utils-lib/types';
 import { WIEntry } from 'sillytavern-utils-lib/types/world-info';
-import * as Handlebars from 'handlebars';
-import '../handlebars-helpers.js';
 
 import { runCharacterFieldGeneration, Session, CHARACTER_FIELDS, CHARACTER_LABELS } from '../generate.js';
 import { ExtensionSettings, settingsManager, convertToVariableName, VERSION } from '../settings.js';
@@ -25,7 +23,7 @@ import { AlternateGreetings, Greeting } from './AlternateGreetings.js';
 import { CompareFieldPopup } from './CompareFieldPopup.js';
 import { CharacterState, ReviseSessionType } from '../revise-types.js';
 import { ReviseSessionManager } from './ReviseSessionManager.js';
-import { buildWorldInfoCharacter } from '../world-info-export.js';
+import { renderWorldInfoCharacterEntry } from '../world-info-export.js';
 import { buildWorldInfoDropdownItems } from '../world-info-selection.js';
 import { getWorldInfoEntries } from '../world-info-entries.js';
 import { loadCharacterSession, saveCharacterSession } from '../browser-storage.js';
@@ -847,10 +845,11 @@ export const MainPopup: FC = () => {
                     return false;
                   }
                   const worldName = proposed[0];
-                  const template = Handlebars.compile(settings.prompts.worldInfoCharDefinition.content);
-                  const content = template({
-                    character: buildWorldInfoCharacter(session.fields, greetings),
-                  });
+                  const content = renderWorldInfoCharacterEntry(
+                    settings.prompts.worldInfoCharDefinition.content,
+                    session.fields,
+                    greetings,
+                  );
                   const entry: WIEntry = {
                     uid: -1,
                     key: [session.fields.name.value],
