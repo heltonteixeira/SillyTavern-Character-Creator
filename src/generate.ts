@@ -8,6 +8,7 @@ import { ExtensionSettings, MessageRole, OutputFormat, settingsManager } from '.
 
 import * as Handlebars from 'handlebars';
 import './handlebars-helpers.js';
+import { protectMacros, renderPrompt } from './prompt-render.js';
 
 export const globalContext = SillyTavern.getContext();
 
@@ -107,20 +108,16 @@ export async function runCharacterFieldGeneration({
 
   const templateData: Record<string, any> = {};
 
-  templateData['char'] = session.fields.name.value ?? '{{char}}';
+  templateData['char'] = protectMacros(session.fields.name.value) || '{{char}}';
   templateData['user'] = includeUserMacro && name1 ? name1 : '{{user}}';
   templateData['persona'] = '{{persona}}'; // ST going to replace this with the actual persona description
 
   templateData['targetField'] = targetField;
-  templateData['userInstructions'] = Handlebars.compile(userPrompt.trim(), { noEscape: true })(templateData);
-  templateData['fieldSpecificInstructions'] = Handlebars.compile(
+  // User-authored content is sent verbatim, see prompt-render.ts
+  templateData['userInstructions'] = protectMacros(userPrompt.trim());
+  templateData['fieldSpecificInstructions'] = protectMacros(
     session.draftFields[targetField]?.prompt ?? session.fields[targetField as CharacterFieldName]?.prompt,
-    { noEscape: true },
-  )({
-    ...templateData,
-    char: targetField === 'mes_example' ? '{{char}}' : templateData.char,
-    user: targetField === 'mes_example' ? '{{user}}' : templateData.user,
-  });
+  );
   templateData['activeFormatInstructions'] = Handlebars.compile(formatDescription.content, { noEscape: true })(
     templateData,
   );
@@ -136,7 +133,7 @@ export async function runCharacterFieldGeneration({
       }
     });
 
-    templateData['characters'] = charactersData;
+    templateData['characters'] = protectMacros(charactersData);
   }
 
   // Add Definitions of Selected Lorebooks (World Info)
@@ -153,7 +150,7 @@ export async function runCharacterFieldGeneration({
         lorebooksData[worldName] = entries.filter((entry) => !entry.disable);
       });
 
-    templateData['lorebooks'] = lorebooksData;
+    templateData['lorebooks'] = protectMacros(lorebooksData);
   }
 
   // Add Current Field Values (if enabled)
@@ -183,23 +180,16 @@ export async function runCharacterFieldGeneration({
       }
 
       if (!shouldSkip) {
-        const compiledValue = Handlebars.compile(field.value, { noEscape: true })({
-          ...templateData,
-
-          char: fieldName === 'mes_example' ? '{{char}}' : templateData.char,
-          user: fieldName === 'mes_example' ? '{{user}}' : templateData.user,
-        });
-
         if (CHARACTER_FIELDS.includes(fieldName as CharacterFieldName)) {
-          coreFields[field.label] = compiledValue;
+          coreFields[field.label] = field.value;
         } else if (fieldName.startsWith('alternate_greetings_')) {
-          alternateGreetingsFields[fieldName] = compiledValue;
+          alternateGreetingsFields[fieldName] = field.value;
         }
       }
     });
 
     Object.entries(session.draftFields || {}).forEach(([_fieldName, field]) => {
-      draftFields[field.label] = Handlebars.compile(field.value, { noEscape: true })(templateData);
+      draftFields[field.label] = field.value;
     });
 
     const allFields: Record<string, any> = {};
@@ -213,7 +203,7 @@ export async function runCharacterFieldGeneration({
       allFields.draft = draftFields;
     }
 
-    templateData['fields'] = allFields;
+    templateData['fields'] = protectMacros(allFields);
   }
 
   const messages: Message[] = [];
@@ -243,13 +233,8 @@ export async function runCharacterFieldGeneration({
       }
       const message: Message = {
         role: mainContext.role,
-        content: Handlebars.compile(prompt.content, { noEscape: true })(newTemplateData),
+        content: renderPrompt(prompt.content, newTemplateData, globalContext.substituteParams),
       };
-      message.content = message.content.replaceAll('{{user}}', '[[[crec_veryUniqueUserPlaceHolder]]]');
-      message.content = message.content.replaceAll('{{char}}', '[[[crec_veryUniqueCharPlaceHolder]]]');
-      message.content = globalContext.substituteParams(message.content);
-      message.content = message.content.replaceAll('[[[crec_veryUniqueUserPlaceHolder]]]', '{{user}}');
-      message.content = message.content.replaceAll('[[[crec_veryUniqueCharPlaceHolder]]]', '{{char}}');
       if (message.content) {
         messages.push(message);
       }
