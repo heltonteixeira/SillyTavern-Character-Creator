@@ -1,6 +1,6 @@
 import type { CharacterState, FieldSpecificResponse, GlobalResponse } from './revise-types.js';
 
-const getGreetings = (state: CharacterState): string[] => {
+const getGreetings = (state: CharacterState): { value: string; prompt: string }[] => {
   return Object.entries(state.fields)
     .filter(([key]) => key.startsWith('alternate_greetings_'))
     .sort((a, b) => {
@@ -8,7 +8,7 @@ const getGreetings = (state: CharacterState): string[] => {
       const indexB = parseInt(b[0].split('_')[2]);
       return indexA - indexB;
     })
-    .map(([, field]) => field.value);
+    .map(([, field]) => ({ value: field.value, prompt: field.prompt }));
 };
 
 export const calculateNewState = (
@@ -53,6 +53,7 @@ export const calculateNewState = (
 
     // Snapshot the greetings after `fields_to_change`, so edits to `alternate_greetings_N` fields are kept.
     // Indices in the greeting operations refer to the numbering the AI saw; change runs first, then remove, then add.
+    // Each greeting keeps its prompt through these operations; new greetings start with an empty prompt.
     let currentGreetings = getGreetings(newState);
     let greetingsModified = false;
 
@@ -61,7 +62,7 @@ export const calculateNewState = (
       for (const change of res.greetings_to_change) {
         // The AI provides a 1-based index.
         if (change.index > 0 && change.index <= currentGreetings.length) {
-          currentGreetings[change.index - 1] = change.value;
+          currentGreetings[change.index - 1].value = change.value;
         }
       }
     }
@@ -74,7 +75,7 @@ export const calculateNewState = (
 
     if (res.greetings_to_add?.length) {
       greetingsModified = true;
-      currentGreetings.push(...res.greetings_to_add);
+      currentGreetings.push(...res.greetings_to_add.map((value) => ({ value, prompt: '' })));
     }
 
     if (greetingsModified) {
@@ -88,12 +89,26 @@ export const calculateNewState = (
       currentGreetings.forEach((greeting, index) => {
         const fieldName = `alternate_greetings_${index + 1}`;
         newState.fields[fieldName] = {
-          value: greeting,
-          prompt: '', // Prompts are not managed in revise sessions.
+          ...greeting,
           label: `Alternate Greeting ${index + 1}`,
         };
       });
     }
   }
   return newState;
+};
+
+/**
+ * Applies the final state of a revise session to the main session. Core fields are merged, while alternate greetings
+ * and draft fields are taken exactly as the revise session left them, so ones it removed don't come back.
+ */
+export const applyReviseState = <T extends CharacterState>(prev: T, newState: CharacterState): T => {
+  const fields = Object.fromEntries(
+    Object.entries(prev.fields).filter(([key]) => !key.startsWith('alternate_greetings_')),
+  );
+  return {
+    ...prev,
+    fields: { ...fields, ...newState.fields },
+    draftFields: { ...newState.draftFields },
+  };
 };
