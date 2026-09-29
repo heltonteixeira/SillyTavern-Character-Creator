@@ -102,7 +102,7 @@ export async function runCharacterFieldGeneration({
 
   const templateData: Record<string, any> = {};
 
-  templateData['char'] = protectMacros(session.fields.name.value) ?? '{{char}}';
+  templateData['char'] = protectMacros(session.fields.name.value) || '{{char}}';
   templateData['user'] = includeUserMacro && name1 ? name1 : '{{user}}';
   templateData['persona'] = '{{persona}}'; // ST going to replace this with the actual persona description
 

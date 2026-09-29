@@ -17834,7 +17834,7 @@ async function ZE({
   if (!S)
     throw new Error(`Could not determine API for profile "${f.name}".`);
   const E = {};
-  E.char = Yt(o.fields.name.value) ?? "{{char}}", E.user = y && _r ? _r : "{{user}}", E.persona = "{{persona}}", E.targetField = b, E.userInstructions = Yt(r.trim()), E.fieldSpecificInstructions = Yt(
+  E.char = Yt(o.fields.name.value) || "{{char}}", E.user = y && _r ? _r : "{{user}}", E.persona = "{{persona}}", E.targetField = b, E.userInstructions = Yt(r.trim()), E.fieldSpecificInstructions = Yt(
     o.draftFields[b]?.prompt ?? o.fields[b]?.prompt
   ), E.activeFormatInstructions = Bi.compile(d.content, { noEscape: !0 })(
     E
