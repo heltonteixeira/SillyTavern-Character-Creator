@@ -1,8 +1,16 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import { parseResponse } from '../parsers.js';
 import { schemaToExample } from '../schema-to-example.js';
 import { createGlobalResponseSchema, FieldSpecificResponseSchema } from '../revise-types.js';
+
+// `makeStructuredRequest` pulls in SillyTavern runtime modules, so replace them with minimal stubs.
+const mockSettings = vi.hoisted(() => ({ prompts: {} as Record<string, { label: string; content: string }> }));
+vi.mock('sillytavern-utils-lib', () => ({ Generator: class {} }));
+vi.mock('sillytavern-utils-lib/config', () => ({ st_echo: vi.fn() }));
+vi.mock('../settings.js', () => ({ settingsManager: { getSettings: () => mockSettings } }));
+
+const { makeStructuredRequest } = await import('../request.js');
 
 const globalSchema = createGlobalResponseSchema(['description', 'personality', 'draft_1'], ['draft_1']);
 const globalJsonSchema = z.toJSONSchema(globalSchema);
@@ -158,5 +166,19 @@ describe('revise schema examples', () => {
     expect(schemaToExample({ type: 'number', exclusiveMinimum: 0 }, 'json')).toBe('1');
     expect(schemaToExample({ type: 'integer', maximum: -2 }, 'json')).toBe('-2');
     expect(schemaToExample({ type: 'integer', minimum: -5, maximum: 5 }, 'json')).toBe('0');
+  });
+});
+
+describe('revise prompt template rendering', () => {
+  test('names the template when it uses an unknown variable', async () => {
+    mockSettings.prompts.reviseXmlPrompt = {
+      label: 'Revise Session (XML Mode)',
+      content: 'Hello {{char}}\n{{example_response}}',
+    };
+
+    const request = makeStructuredRequest('profile', [], globalSchema, 'GlobalRevision', 'xml', 100);
+    await expect(request).rejects.toThrow('Revise Session (XML Mode)');
+    await expect(request).rejects.toThrow('"char" not defined');
+    await expect(request).rejects.toThrow('example_response, schema');
   });
 });
