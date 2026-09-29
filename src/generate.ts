@@ -9,19 +9,11 @@ import { ExtensionSettings, MessageRole, OutputFormat, settingsManager } from '.
 import * as Handlebars from 'handlebars';
 import './handlebars-helpers.js';
 import { protectMacros, renderPrompt } from './prompt-render.js';
+import { buildFieldList, CHARACTER_FIELDS, CharacterFieldName, getFieldLabel, selectSentFields } from './field-list.js';
 
 export const globalContext = SillyTavern.getContext();
 
-export type CharacterFieldName = 'name' | 'description' | 'personality' | 'scenario' | 'first_mes' | 'mes_example';
-
-export const CHARACTER_FIELDS: CharacterFieldName[] = [
-  'name',
-  'description',
-  'personality',
-  'scenario',
-  'first_mes',
-  'mes_example',
-];
+export { CHARACTER_FIELDS, type CharacterFieldName };
 
 export const CHARACTER_LABELS: Record<CharacterFieldName, string> = {
   name: 'Name',
@@ -114,6 +106,7 @@ export async function runCharacterFieldGeneration({
 
   templateData['targetField'] = targetField;
   // User-authored content is sent verbatim, see prompt-render.ts
+  templateData['targetLabel'] = protectMacros(getFieldLabel(targetField, session.fields, session.draftFields));
   templateData['userInstructions'] = protectMacros(userPrompt.trim());
   templateData['fieldSpecificInstructions'] = protectMacros(
     session.draftFields[targetField]?.prompt ?? session.fields[targetField as CharacterFieldName]?.prompt,
@@ -160,31 +153,14 @@ export async function runCharacterFieldGeneration({
     const alternateGreetingsFields: Record<string, string> = {};
     const draftFields: Record<string, string> = {};
 
-    const isTargetAlternateGreeting = targetField.startsWith('alternate_greetings_');
     const dontSendOtherGreetings = settingsManager.getSettings().contextToSend.dontSendOtherGreetings;
+    const sentFields = selectSentFields(session.fields, targetField, dontSendOtherGreetings);
 
-    Object.entries(session.fields).forEach(([fieldName, field]) => {
-      // There are 2 case.
-      // 1. If the target is non-alternate greeting, we send all fields except alternate greetings.
-      // 2. If the target is alternate greeting, we send only the target field and skip all other alternate greetings. We also skip the first message field in this case.
-      let shouldSkip = false;
-      if (dontSendOtherGreetings) {
-        const isAlternateGreeting = fieldName.startsWith('alternate_greetings_');
-        if (isTargetAlternateGreeting) {
-          // If the target is an alternate greeting, skip all other alternate greetings and first message
-          shouldSkip = (isAlternateGreeting && fieldName !== targetField) || fieldName === 'first_mes';
-        } else {
-          // If the target is not an alternate greeting, skip all alternate greetings and first message
-          shouldSkip = isAlternateGreeting;
-        }
-      }
-
-      if (!shouldSkip) {
-        if (CHARACTER_FIELDS.includes(fieldName as CharacterFieldName)) {
-          coreFields[field.label] = field.value;
-        } else if (fieldName.startsWith('alternate_greetings_')) {
-          alternateGreetingsFields[fieldName] = field.value;
-        }
+    Object.entries(sentFields).forEach(([fieldName, field]) => {
+      if (CHARACTER_FIELDS.includes(fieldName as CharacterFieldName)) {
+        coreFields[field.label] = field.value;
+      } else if (fieldName.startsWith('alternate_greetings_')) {
+        alternateGreetingsFields[fieldName] = field.value;
       }
     });
 
@@ -204,6 +180,8 @@ export async function runCharacterFieldGeneration({
     }
 
     templateData['fields'] = protectMacros(allFields);
+    // Every sent field with its ID and label, see FieldListItem in field-list.ts
+    templateData['fieldList'] = protectMacros(buildFieldList(sentFields, session.draftFields));
   }
 
   const messages: Message[] = [];
