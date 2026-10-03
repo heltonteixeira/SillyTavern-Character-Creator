@@ -6,7 +6,7 @@ import { createGlobalResponseSchema, FieldSpecificResponseSchema } from '../revi
 
 // `makeStructuredRequest` pulls in SillyTavern runtime modules, so replace them with minimal stubs.
 const mockSettings = vi.hoisted(() => ({ prompts: {} as Record<string, { label: string; content: string }> }));
-vi.mock('sillytavern-utils-lib', () => ({ Generator: class {} }));
+vi.mock('sillytavern-utils-lib', () => ({}));
 vi.mock('sillytavern-utils-lib/config', () => ({ st_echo: vi.fn() }));
 vi.mock('../settings.js', () => ({ settingsManager: { getSettings: () => mockSettings } }));
 

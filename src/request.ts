@@ -1,74 +1,71 @@
-import { Generator, Message } from 'sillytavern-utils-lib';
-import { ExtractedData, StreamResponse } from 'sillytavern-utils-lib/types';
+import { Message } from 'sillytavern-utils-lib';
+import { ExtractedData } from 'sillytavern-utils-lib/types';
 import { z } from 'zod';
 import { st_echo } from 'sillytavern-utils-lib/config';
 import { PromptEngineeringMode, settingsManager } from './settings.js';
 import * as Handlebars from 'handlebars';
 import './handlebars-helpers.js';
 import { schemaToExample } from './schema-to-example.js';
-import { parseResponse } from './parsers.js';
+import { parseResponse, responseSnippet } from './parsers.js';
+import {
+  emptyResponseMessage,
+  isEmptyResponse,
+  readResponseInfo,
+  ResponseInfo,
+  truncatedResponseMessage,
+  truncatedTextWarning,
+} from './llm-response.js';
 
-const generator = new Generator();
-
-async function makeRequest(
+/**
+ * Sends a non-streaming request and reads the raw provider response, so the finish reason and reasoning are known.
+ * For Chat Completion, ST's JSON extraction is skipped: it returns `{}` for text that isn't pure JSON.
+ * @throws AbortError if the signal was aborted
+ */
+export async function sendRawRequest(
   profileId: string,
-  prompt: Message[],
+  messages: Message[],
   maxTokens: number,
-  overridePayload: any,
-  streamCallbacks?: {
-    onStream: (data: { chunk: string; fullText: string }) => Promise<void> | void;
-  },
+  overridePayload: Record<string, any> = {},
   signal?: AbortSignal,
-): Promise<ExtractedData | undefined> {
-  const stream = !overridePayload.json_schema && !!streamCallbacks;
-  let previousText = '';
+): Promise<ResponseInfo> {
+  const context = SillyTavern.getContext();
+  const service = context.ConnectionManagerRequestService as any;
+  const mainApi: string = service.validateProfile(service.getProfile(profileId)).selected;
+  // Text Completion keeps ST's extraction, which trims stop strings and instruct sequences.
+  const extractData = mainApi !== 'openai';
 
-  return new Promise((resolve, reject) => {
-    const abortController = new AbortController();
-
-    const combinedSignal = signal ?? abortController.signal;
-    if (signal) {
-      signal.addEventListener('abort', () => abortController.abort(), { once: true });
-    }
-
-    generator.generateRequest(
-      {
-        profileId,
-        prompt,
-        maxTokens,
-        custom: { stream, signal: combinedSignal },
-        overridePayload,
-      },
-      {
-        abortController,
-        onEntry: stream
-          ? async (_requestId, streamData) => {
-              const text = (streamData as StreamResponse).text;
-              if (text && streamCallbacks) {
-                await streamCallbacks.onStream({ chunk: text.slice(previousText.length), fullText: text });
-                previousText = text;
-              }
-            }
-          : undefined,
-        onFinish: (_requestId, data, error) => {
-          if (combinedSignal.aborted) {
-            return reject(new DOMException('Request aborted by user', 'AbortError'));
-          }
-          if (error) return reject(error);
-
-          if (data === undefined && error === undefined) {
-            if (stream) {
-              return resolve({ content: previousText });
-            }
-            return reject(new DOMException('Request aborted by user', 'AbortError'));
-          }
-          if (!data) reject(new Error('No data received from LLM'));
-          if (error) return reject(error);
-          return streamCallbacks ? resolve({ content: previousText }) : resolve(data as ExtractedData);
-        },
-      },
+  let data: any;
+  try {
+    data = await service.sendRequest(
+      profileId,
+      messages,
+      maxTokens,
+      { stream: false, signal, extractData },
+      overridePayload,
     );
-  });
+  } catch (error) {
+    if (signal?.aborted) {
+      throw new DOMException('Request aborted by user', 'AbortError');
+    }
+    throw error;
+  }
+  if (signal?.aborted) {
+    throw new DOMException('Request aborted by user', 'AbortError');
+  }
+
+  if (extractData) {
+    const content = (data as ExtractedData)?.content;
+    const info = readResponseInfo({}, typeof content === 'string' ? content : '', maxTokens);
+    // With a JSON schema, ST returns the parsed object
+    const structured = content !== null && typeof content === 'object' ? content : undefined;
+    return { ...info, structured, hasReasoning: info.hasReasoning || !!data?.reasoning };
+  }
+  return readResponseInfo(
+    data,
+    context.extractMessageFromData(data, mainApi),
+    maxTokens,
+    !!overridePayload.json_schema,
+  );
 }
 
 export async function makePlainRequest(
@@ -77,13 +74,36 @@ export async function makePlainRequest(
   maxTokens: number,
   signal?: AbortSignal,
 ): Promise<string> {
-  const response = await makeRequest(profileId, prompt, maxTokens, {}, undefined, signal);
+  const response = await sendRawRequest(profileId, prompt, maxTokens, {}, signal);
 
-  if (!response?.content) {
-    throw new Error('Plain request failed to return content.');
+  if (isEmptyResponse(response)) {
+    throw new Error(emptyResponseMessage(response));
+  }
+  if (response.truncated) {
+    st_echo('warning', truncatedTextWarning(response));
   }
 
-  return response.content as string;
+  return response.text;
+}
+
+/**
+ * Parses a structured response, explaining empty and cut-off responses.
+ */
+function parseStructuredResponse(response: ResponseInfo, format: 'json' | 'xml', jsonSchema: any): unknown {
+  if (response.structured !== undefined) {
+    return response.structured;
+  }
+  if (isEmptyResponse(response)) {
+    throw new Error(emptyResponseMessage(response));
+  }
+  try {
+    return parseResponse(response.text, format, { schema: jsonSchema });
+  } catch (error) {
+    if (response.truncated) {
+      throw new Error(truncatedResponseMessage(response, format));
+    }
+    throw error;
+  }
 }
 
 export async function makeStructuredRequest<T extends z.ZodType<any, any, any>>(
@@ -96,26 +116,22 @@ export async function makeStructuredRequest<T extends z.ZodType<any, any, any>>(
   signal?: AbortSignal,
 ): Promise<z.infer<T>> {
   const settings = settingsManager.getSettings();
-  let response: ExtractedData | undefined;
-  let parsedContent: any;
+  let response: ResponseInfo;
+  let parsedContent: unknown;
 
   const jsonSchema = z.toJSONSchema(schema);
 
   if (promptEngineeringMode === 'native') {
-    response = await makeRequest(
+    response = await sendRawRequest(
       profileId,
       baseMessages,
       maxResponseToken,
       {
         json_schema: { name: schemaName, strict: true, value: jsonSchema },
       },
-      undefined,
       signal,
     );
-    if (!response?.content) {
-      throw new Error(`Structured request for ${schemaName} failed to return content.`);
-    }
-    parsedContent = typeof response.content === 'string' ? JSON.parse(response.content) : response.content;
+    parsedContent = parseStructuredResponse(response, 'json', jsonSchema);
   } else {
     // Manual prompt engineering for JSON or XML
     const format = promptEngineeringMode as 'json' | 'xml';
@@ -145,29 +161,24 @@ export async function makeStructuredRequest<T extends z.ZodType<any, any, any>>(
     }
     const instructionMessage: Message = { role: 'system', content: resolvedPrompt };
 
-    response = await makeRequest(
-      profileId,
-      [...baseMessages, instructionMessage],
-      maxResponseToken,
-      {},
-      undefined,
-      signal,
-    );
-
-    if (!response?.content) {
-      throw new Error(`Structured request for ${schemaName} failed to return content.`);
-    }
-
-    parsedContent = parseResponse(response.content as string, format, { schema: jsonSchema });
+    response = await sendRawRequest(profileId, [...baseMessages, instructionMessage], maxResponseToken, {}, signal);
+    parsedContent = parseStructuredResponse(response, format, jsonSchema);
   }
 
   const validationResult = schema.safeParse(parsedContent);
   if (!validationResult.success) {
-    const errorMessage = `Model response failed schema validation for ${schemaName}. Check console for details.`;
-    console.error('Zod validation failed:', validationResult.error.issues);
-    console.error('Raw content parsed:', parsedContent);
-    await st_echo('error', errorMessage);
-    throw new Error(errorMessage);
+    const issues = validationResult.error.issues;
+    console.error('Zod validation failed:', issues);
+    console.error('Raw response:', response.text, 'Parsed:', parsedContent);
+    const issueList = issues
+      .slice(0, 3)
+      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .join('; ');
+    const raw = response.structured !== undefined ? JSON.stringify(response.structured) : response.text;
+    throw new Error(
+      `Model response failed schema validation for ${schemaName} (${issueList}${issues.length > 3 ? '; …' : ''}). ` +
+        responseSnippet(raw),
+    );
   }
 
   return validationResult.data;

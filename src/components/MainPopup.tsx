@@ -27,6 +27,7 @@ import { ReviseSessionManager } from './ReviseSessionManager.js';
 import { renderWorldInfoCharacterEntry } from '../world-info-export.js';
 import { buildWorldInfoDropdownItems } from '../world-info-selection.js';
 import { getWorldInfoEntries } from '../world-info-entries.js';
+import { getErrorMessage } from '../llm-response.js';
 import { loadCharacterSession, saveCharacterSession } from '../browser-storage.js';
 
 const globalContext = SillyTavern.getContext();
@@ -344,7 +345,7 @@ export const MainPopup: FC = () => {
         }
       } catch (e: any) {
         console.error(e);
-        st_echo('error', e.message || String(e));
+        st_echo('error', getErrorMessage(e));
       } finally {
         setIsGenerating((prev) => prev.filter((id) => id !== targetField));
       }

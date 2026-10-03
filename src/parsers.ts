@@ -202,6 +202,94 @@ function decodeJsonStringFragment(fragment: string): string {
   }
 }
 
+const leadingReasoningRegex = /^\s*<(think|thinking|reasoning)>[\s\S]*?(?:<\/\1>|$)/i;
+
+/**
+ * Removes a leading reasoning block (e.g. `<think>...</think>`) that some models put in the content.
+ * An unclosed block (cut off while thinking) runs to the end.
+ */
+export function stripReasoningTags(content: string): string {
+  return content.replace(leadingReasoningRegex, '');
+}
+
+/**
+ * Formats the start of a response for error messages, e.g. `It starts with: "Sure, here..."…`.
+ */
+export function responseSnippet(content: string, length = 120): string {
+  const text = content.trim().replace(/\s+/g, ' ');
+  return `It starts with: "${text.slice(0, length)}"${text.length > length ? '…' : ''}`;
+}
+
+/**
+ * Finds top-level `{...}` blocks with balanced braces, ignoring braces inside JSON strings.
+ */
+function findJsonObjectCandidates(text: string): string[] {
+  const candidates: string[] = [];
+  let from = 0;
+  while (from < text.length) {
+    let depth = 0;
+    let start = -1;
+    let inString = false;
+    let escaped = false;
+    for (let i = from; i < text.length; i++) {
+      const char = text[i];
+      if (depth === 0) {
+        if (char === '{') {
+          start = i;
+          depth = 1;
+        }
+      } else if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === '\\') {
+          escaped = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+      } else if (char === '"') {
+        inString = true;
+      } else if (char === '{') {
+        depth++;
+      } else if (char === '}' && --depth === 0) {
+        candidates.push(text.slice(start, i + 1));
+      }
+    }
+    if (depth === 0) {
+      break;
+    }
+    // An object that never closes (e.g. a stray `{` in prose): look for objects after its opening brace.
+    from = start + 1;
+  }
+  return candidates;
+}
+
+/**
+ * Parses JSON from a model response that may wrap it in prose or a code block.
+ * Tries the whole text, then the last code block, then the last balanced top-level `{...}` that parses.
+ * @throws The error of parsing the whole text (or the last code block), if nothing parses.
+ */
+export function extractJson(content: string): any {
+  const text = stripReasoningTags(content).trim();
+  const codeBlock = extractLastCodeBlock(text);
+  let error: unknown;
+  for (const candidate of codeBlock === null ? [text] : [text, codeBlock]) {
+    try {
+      return JSON.parse(candidate);
+    } catch (e) {
+      error = e;
+    }
+  }
+  const candidates = findJsonObjectCandidates(text);
+  for (let i = candidates.length - 1; i >= 0; i--) {
+    try {
+      return JSON.parse(candidates[i]);
+    } catch {
+      // Try the previous one
+    }
+  }
+  throw error;
+}
+
 function extractStringValue(data: any): string {
   if (data === null || data === undefined) {
     return '';
@@ -228,6 +316,7 @@ export function parseResponse(
   format: 'xml' | 'json' | 'none',
   options: ParseOptions = {},
 ): object | string {
+  content = stripReasoningTags(content);
   // Extract content from inside code blocks, handling language identifiers
   const codeBlockContent = extractLastCodeBlock(content);
   let cleanedContent = codeBlockContent ?? content.trim();
@@ -244,10 +333,24 @@ export function parseResponse(
         // The validator is too strict for partial content, so we bypass it in those cases.
         // A simple heuristic: if it doesn't end with the closing root tag, it's likely partial.
         if (options.schema) {
+          if (codeBlockContent === null) {
+            // Drop an unclosed code block start (e.g. a cut-off response) and any text around the root element.
+            cleanedContent = cleanedContent.replace(/^```\w*\s*/, '');
+            const rootStart = cleanedContent.search(/<root(?:\s[^>]*)?>/);
+            const rootEnd = cleanedContent.lastIndexOf('</root>');
+            if (rootStart !== -1) {
+              cleanedContent = cleanedContent.slice(
+                rootStart,
+                rootEnd > rootStart ? rootEnd + '</root>'.length : undefined,
+              );
+            }
+          }
           cleanedContent = escapeBareAmpersands(cleanedContent);
           const validationResult = XMLValidator.validate(cleanedContent);
           if (validationResult !== true) {
-            throw new Error(`Model response is not valid XML: ${validationResult.err.msg}`);
+            throw new Error(
+              `Model response is not valid XML: ${validationResult.err.msg}. ${responseSnippet(content)}`,
+            );
           }
         }
         let parsedXml = (options.schema ? schemaXmlParser : xmlParser).parse(cleanedContent);
@@ -277,8 +380,10 @@ export function parseResponse(
             }
           }
         }
-        const parsedJson = JSON.parse(cleanedContent);
-        return options.schema ? parsedJson : extractStringValue(parsedJson);
+        if (options.schema) {
+          return extractJson(content);
+        }
+        return extractStringValue(JSON.parse(cleanedContent));
 
       case 'none':
         return unwrapCodeBlock(content.trim());
@@ -307,7 +412,7 @@ export function parseResponse(
       throw new Error(`Model response is not valid XML: ${error.message}`);
     }
     if (format === 'json') {
-      throw new Error('Model response is not valid JSON.');
+      throw new Error(`Model response is not valid JSON (${error.message}). ${responseSnippet(content)}`);
     }
     throw new Error(`Failed to parse response as ${format}: ${error.message}`);
   }
@@ -361,6 +466,29 @@ function isCompleteResponse(reply: string, existing: string, format: 'xml' | 'js
   }
 }
 
+function isJsonStringFragment(text: string): boolean {
+  try {
+    JSON.parse(`"${text.replace(/[\u0000-\u001f]/g, (char) => JSON.stringify(char).slice(1, -1))}"`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Checks if a reply to a JSON continue request is bare prose: it doesn't close the JSON object and can't be the rest
+ * of the prefilled JSON string, e.g. because it has unescaped quotes.
+ */
+function isPlainTextReply(reply: string): boolean {
+  // JSON objects (complete or not) and code blocks are not plain text
+  if (/^\s*(?:```|\{\s*")/.test(reply) || /}\s*(?:```)?\s*$/.test(reply)) {
+    return false;
+  }
+  // The model may close the prefilled string without the object, or be cut off in an escape sequence.
+  const withoutEnd = reply.replace(/"\s*$/, '').replace(/(^|[^\\])((?:\\\\)*)\\(?:u[0-9a-fA-F]{0,3})?$/, '$1$2');
+  return !isJsonStringFragment(reply) && !isJsonStringFragment(withoutEnd);
+}
+
 /**
  * Separator between the existing text and a separately written continuation (both trimmed):
  * a blank line after the end of a sentence (`.`, `!`, `?`, `…`, a closing quote or bracket, or `*` closing an action),
@@ -383,9 +511,19 @@ function getContinuationJoiner(existing: string, addition: string): string {
  */
 export function mergeContinuation(existing: string, reply: string, format: 'xml' | 'json' | 'none'): string {
   const trimmedExisting = existing.trim();
+  reply = stripReasoningTags(reply);
 
   if (format !== 'none' && closingOnlyRegex[format].test(reply)) {
     return trimmedExisting;
+  }
+
+  if (format === 'json' && isPlainTextReply(reply)) {
+    // The model wrote the continuation as plain text instead of JSON, so take it verbatim.
+    const text = reply.trim();
+    if (text.startsWith(trimmedExisting)) {
+      return text;
+    }
+    return trimmedExisting + getContinuationJoiner(trimmedExisting, text) + text;
   }
 
   if (!isCompleteResponse(reply, trimmedExisting, format)) {

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { getPrefilled, mergeContinuation, parseResponse } from '../parsers.js';
+import { extractJson, getPrefilled, mergeContinuation, parseResponse } from '../parsers.js';
 
 describe('single-field XML responses', () => {
   test('keeps markup inside <response> verbatim', () => {
@@ -132,6 +132,28 @@ describe('structured (schema) responses', () => {
     const input = 'Here you go:\n```json\n{"name": "Ann", "tags": ["a"]}\n```';
     expect(parseResponse(input, 'json', { schema })).toEqual({ name: 'Ann', tags: ['a'] });
   });
+
+  test('parses the last JSON object after prose', () => {
+    const input =
+      'I could use {"name": "Bob"}, but {braces} aside, here it is:\n\n{"name": "Ann {x}", "tags": []}\nDone.';
+    expect(parseResponse(input, 'json', { schema })).toEqual({ name: 'Ann {x}', tags: [] });
+    expect(parseResponse('A stray { in prose.\n{"name": "Ann"}', 'json', { schema })).toEqual({ name: 'Ann' });
+  });
+
+  test('ignores a leading reasoning block', () => {
+    const input = '<think>Maybe {"name": "Bob"}?</think>\n{"name": "Ann"}';
+    expect(parseResponse(input, 'json', { schema })).toEqual({ name: 'Ann' });
+    expect(extractJson('<think>\nhmm\n</think>{"a": 1}')).toEqual({ a: 1 });
+  });
+
+  test('explains invalid JSON', () => {
+    const input = '{"name": "She said "no""}';
+    expect(() => parseResponse(input, 'json', { schema })).toThrow(
+      /^Model response is not valid JSON \(.+\)\. It starts with: "\{"name": "She said "no""\}"$/,
+    );
+    const long = `Prose ${'x'.repeat(200)}`;
+    expect(() => parseResponse(long, 'json', { schema })).toThrow(`It starts with: "${long.slice(0, 120)}"…`);
+  });
 });
 
 describe('mergeContinuation', () => {
@@ -176,6 +198,25 @@ describe('mergeContinuation', () => {
     expect(mergeContinuation('She waves.', ' And greets {{user}}"}', 'json')).toBe('She waves. And greets {{user}}');
     expect(mergeContinuation('She greets {{user}}', '"}', 'json')).toBe('She greets {{user}}');
     expect(mergeContinuation('She greets {{user}}', '}', 'json')).toBe('She greets {{user}}');
+  });
+
+  test('JSON: appends a plain text reply verbatim', () => {
+    const text = 'He asks if she came alone.\n\n{{char}}:';
+    const reply =
+      'Tayama doesn\'t flinch. She takes a slow drag, then exhales.\n\n"Or did you just pick the first woman you found?"';
+    expect(mergeContinuation(text, reply, 'json')).toBe(`${text} ${reply}`);
+    expect(mergeContinuation('She waves.', ' She says "hi" and leaves.', 'json')).toBe(
+      'She waves.\n\nShe says "hi" and leaves.',
+    );
+    // Repeats the existing text
+    expect(mergeContinuation('She waves.', 'She waves. Then says "hi".', 'json')).toBe('She waves. Then says "hi".');
+  });
+
+  test('JSON: a reply that continues the JSON string is decoded', () => {
+    expect(mergeContinuation('She waves.', ' She says \\"hi\\".\\n\\nThen leaves."', 'json')).toBe(
+      'She waves. She says "hi".\n\nThen leaves.',
+    );
+    expect(mergeContinuation('She waves.', ' Then\nleaves.', 'json')).toBe('She waves. Then\nleaves.');
   });
 
   test('JSON: keeps a trailing backslash', () => {

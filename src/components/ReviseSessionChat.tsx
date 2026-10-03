@@ -12,6 +12,7 @@ import {
   CHAT_HISTORY_PLACEHOLDER_ID,
 } from '../revise-types.js';
 import { makePlainRequest, makeStructuredRequest } from '../request.js';
+import { getErrorMessage } from '../llm-response.js';
 import { calculateNewState } from '../revise-state.js';
 import { settingsManager, PromptEngineeringMode } from '../settings.js';
 import { selected_group, st_echo, this_chid } from 'sillytavern-utils-lib/config';
@@ -393,7 +394,7 @@ export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
           st_echo('info', 'Request was cancelled.');
         } else {
           console.error('Revise request failed:', error);
-          st_echo('error', `Request failed: ${error.message}`);
+          st_echo('error', `Request failed: ${getErrorMessage(error)}`);
         }
         revertUpdate();
       } finally {

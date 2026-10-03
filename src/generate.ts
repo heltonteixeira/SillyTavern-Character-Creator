@@ -1,6 +1,5 @@
 import { buildPrompt, BuildPromptOptions, ExtensionSettingsManager, Message } from 'sillytavern-utils-lib';
 import { parseResponse, getPrefilled, mergeContinuation } from './parsers.js';
-import { ExtractedData } from 'sillytavern-utils-lib/types';
 import { Character } from 'sillytavern-utils-lib/types';
 import { WIEntry } from 'sillytavern-utils-lib/types/world-info';
 import { name1, st_echo } from 'sillytavern-utils-lib/config';
@@ -9,6 +8,8 @@ import { ExtensionSettings, MessageRole, OutputFormat, settingsManager } from '.
 import * as Handlebars from 'handlebars';
 import './handlebars-helpers.js';
 import { protectMacros, renderPrompt } from './prompt-render.js';
+import { sendRawRequest } from './request.js';
+import { emptyResponseMessage, isEmptyResponse, truncatedTextWarning } from './llm-response.js';
 import { buildFieldList, CHARACTER_FIELDS, CharacterFieldName, getFieldLabel, selectSentFields } from './field-list.js';
 
 export const globalContext = SillyTavern.getContext();
@@ -231,15 +232,18 @@ export async function runCharacterFieldGeneration({
     }
   }
 
-  const response = (await globalContext.ConnectionManagerRequestService.sendRequest(
-    profileId,
-    messages,
-    maxResponseToken,
-  )) as ExtractedData;
+  const response = await sendRawRequest(profileId, messages, maxResponseToken);
+  // An empty reply to a continue request only means nothing was added, unless it was cut off.
+  if (isEmptyResponse(response) && (!continueFrom || response.truncated)) {
+    throw new Error(emptyResponseMessage(response));
+  }
+  if (response.truncated) {
+    st_echo('warning', truncatedTextWarning(response));
+  }
 
   // For "continue" requests, the model should only return the new part, but some models ignore the prefill.
   if (continueFrom) {
-    const continued = mergeContinuation(continueFrom, response.content, outputFormat);
+    const continued = mergeContinuation(continueFrom, response.text, outputFormat);
     if (continued.trim() === continueFrom.trim()) {
       st_echo('warning', "The model didn't add any text. Try again or use a different model.");
       return continueFrom;
@@ -247,7 +251,7 @@ export async function runCharacterFieldGeneration({
     return continued;
   }
 
-  const result = parseResponse(response.content, outputFormat);
+  const result = parseResponse(response.text, outputFormat);
 
   let finalContent: string;
   if (typeof result === 'string') {
