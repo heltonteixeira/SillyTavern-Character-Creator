@@ -79,11 +79,11 @@ export const ReviseSessionManager: FC<ReviseSessionManagerProps> = ({
       target.type === 'field'
         ? initialState.fields[target.fieldId!]?.label || initialState.draftFields[target.fieldId!]?.label
         : 'Global';
-    const name = await globalContext.Popup.show.input(
-      'New Session Name',
-      `Session for ${targetLabel} - ${new Date().toLocaleDateString()}`,
-    );
-    if (!name) return;
+    const defaultName = `Session for ${targetLabel} - ${new Date().toLocaleDateString()}`;
+    const input = await globalContext.Popup.show.input('New Session Name', '', defaultName);
+    // null means cancelled; an emptied name falls back to the default
+    if (input === null) return;
+    const name = input.trim() || defaultName;
 
     try {
       const currentSettings = settingsManager.getSettings();
