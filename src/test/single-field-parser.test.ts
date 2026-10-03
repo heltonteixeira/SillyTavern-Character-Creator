@@ -246,6 +246,17 @@ describe('mergeContinuation', () => {
     expect(mergeContinuation(existing, `${existing} and left.`, 'none')).toBe(`${existing} and left.`);
   });
 
+  test('adds the missing space when a continuation starts a new sentence', () => {
+    expect(mergeContinuation('She waves.', 'Then she leaves.', 'none')).toBe('She waves. Then she leaves.');
+    expect(mergeContinuation('*She waves.*', 'Then she leaves.', 'none')).toBe('*She waves.* Then she leaves.');
+    expect(mergeContinuation('She waves.', 'Then leaves."\n}', 'json')).toBe('She waves. Then leaves.');
+    expect(mergeContinuation('She waves.', 'Then leaves.]]></response>', 'xml')).toBe('She waves. Then leaves.');
+    // The rest of a word, a closing quote or a number is joined as is
+    expect(mergeContinuation('She wa', 'ves.', 'none')).toBe('She waves.');
+    expect(mergeContinuation('She says "Hi.', '" Then leaves.', 'none')).toBe('She says "Hi." Then leaves.');
+    expect(mergeContinuation('Version 2.', '5 is out.', 'none')).toBe('Version 2.5 is out.');
+  });
+
   test('always keeps the existing text', () => {
     const cases: [string, 'xml' | 'json' | 'none'][] = [
       ['{"response": "New."}', 'json'],

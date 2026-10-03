@@ -502,6 +502,17 @@ function getContinuationJoiner(existing: string, addition: string): string {
 }
 
 /**
+ * Joins a continuation of the prefill to the existing text. Some models start a new sentence without the space after
+ * the existing text, so a space is added between a sentence end and a letter. Anything else is joined as is,
+ * e.g. the rest of a cut-off word or a closing quote.
+ */
+function joinPrefillContinuation(existing: string, addition: string): string {
+  return /[.!?…]["'”’»)\]*]*$/.test(existing) && /^\p{L}/u.test(addition)
+    ? `${existing} ${addition}`
+    : existing + addition;
+}
+
+/**
  * Merges the model's reply to a continue request (sent with the `getPrefilled` prefill) into the existing text.
  * The result always starts with the existing text.
  * @param existing The text that was continued
@@ -530,7 +541,7 @@ export function mergeContinuation(existing: string, reply: string, format: 'xml'
     // The model continued the prefill
     const continued = String(parseResponse(getPrefilled(existing, format) + reply, format));
     if (continued.startsWith(trimmedExisting)) {
-      return continued;
+      return joinPrefillContinuation(trimmedExisting, continued.slice(trimmedExisting.length));
     }
   }
 
