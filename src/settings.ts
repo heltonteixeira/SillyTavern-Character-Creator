@@ -20,7 +20,7 @@ import { globalContext } from './generate.js';
 import { migrateSettings, updateDefaultPrompts } from './settings-migration.js';
 
 export const extensionName = 'SillyTavern-Character-Creator';
-export const VERSION = '0.3.0';
+export const VERSION = '0.4.0';
 export const FORMAT_VERSION = 'F_1.11';
 
 export const KEYS = {

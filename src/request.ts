@@ -15,6 +15,7 @@ import {
   truncatedResponseMessage,
   truncatedTextWarning,
 } from './llm-response.js';
+import { buildPresetPayload, RequestError, toRequestMessages } from './request-payload.js';
 
 /**
  * Sends a non-streaming request and reads the raw provider response, so the finish reason and reasoning are known.
@@ -30,42 +31,70 @@ export async function sendRawRequest(
 ): Promise<ResponseInfo> {
   const context = SillyTavern.getContext();
   const service = context.ConnectionManagerRequestService as any;
-  const mainApi: string = service.validateProfile(service.getProfile(profileId)).selected;
+  const profile = service.getProfile(profileId);
+  const apiMap = service.validateProfile(profile);
+  const mainApi: string = apiMap.selected;
   // Text Completion keeps ST's extraction, which trims stop strings and instruct sequences.
   const extractData = mainApi !== 'openai';
+  const requestMessages = toRequestMessages(messages, mainApi);
 
+  const custom: Record<string, any> = { stream: false, signal, extractData };
+  let payload = overridePayload;
   let data: any;
   try {
-    data = await service.sendRequest(
-      profileId,
-      messages,
-      maxTokens,
-      { stream: false, signal, extractData },
-      overridePayload,
-    );
+    if (mainApi === 'openai') {
+      const presetPayload = await buildPresetPayload(context, profile, apiMap.source, requestMessages, maxTokens);
+      if (presetPayload) {
+        custom.includePreset = false;
+        payload = { ...presetPayload, ...overridePayload };
+      }
+    }
+    // Building the preset payload is async, so the request may have been cancelled meanwhile.
+    signal?.throwIfAborted();
+    data = await service.sendRequest(profileId, requestMessages, maxTokens, custom, payload);
   } catch (error) {
     if (signal?.aborted) {
       throw new DOMException('Request aborted by user', 'AbortError');
     }
-    throw error;
+    throw new RequestError(profile, error);
   }
   if (signal?.aborted) {
     throw new DOMException('Request aborted by user', 'AbortError');
   }
 
+  let info: ResponseInfo;
   if (extractData) {
     const content = (data as ExtractedData)?.content;
-    const info = readResponseInfo({}, typeof content === 'string' ? content : '', maxTokens);
+    info = readResponseInfo({}, typeof content === 'string' ? content : '', maxTokens);
     // With a JSON schema, ST returns the parsed object
     const structured = content !== null && typeof content === 'object' ? content : undefined;
-    return { ...info, structured, hasReasoning: info.hasReasoning || !!data?.reasoning };
+    info = { ...info, structured, hasReasoning: info.hasReasoning || !!data?.reasoning };
+  } else {
+    info = readResponseInfo(data, context.extractMessageFromData(data, mainApi), maxTokens, !!payload.json_schema);
   }
-  return readResponseInfo(
-    data,
-    context.extractMessageFromData(data, mainApi),
-    maxTokens,
-    !!overridePayload.json_schema,
-  );
+  return estimateTruncation(info, context);
+}
+
+/** Share of the response tokens a response must reach to count as probably cut off. */
+const PROBABLY_TRUNCATED_RATIO = 0.9;
+
+/**
+ * Some responses come without a finish reason (ST passes on Claude's text without it), so a cut-off response can't
+ * be told apart. If the text is close to the token limit, it is marked as probably cut off.
+ */
+async function estimateTruncation(info: ResponseInfo, context: any): Promise<ResponseInfo> {
+  if (info.finishReason !== undefined || !info.text || typeof context.getTokenCountAsync !== 'function') {
+    return info;
+  }
+  try {
+    const tokens = await context.getTokenCountAsync(info.text);
+    if (tokens >= info.maxTokens * PROBABLY_TRUNCATED_RATIO) {
+      return { ...info, truncated: true, truncationEstimated: true };
+    }
+  } catch (error) {
+    console.warn('Could not count response tokens', error);
+  }
+  return info;
 }
 
 export async function makePlainRequest(
@@ -106,6 +135,14 @@ function parseStructuredResponse(response: ResponseInfo, format: 'json' | 'xml',
   }
 }
 
+/** Profiles (with their model) whose native mode request was rejected. Kept until the page is reloaded. */
+const nativeModeRejected = new Set<string>();
+
+function nativeModeKey(profileId: string): string {
+  const profile = (SillyTavern.getContext().ConnectionManagerRequestService as any).getProfile(profileId);
+  return `${profileId}:${profile?.model ?? ''}`;
+}
+
 export async function makeStructuredRequest<T extends z.ZodType<any, any, any>>(
   profileId: string,
   baseMessages: Message[],
@@ -116,25 +153,46 @@ export async function makeStructuredRequest<T extends z.ZodType<any, any, any>>(
   signal?: AbortSignal,
 ): Promise<z.infer<T>> {
   const settings = settingsManager.getSettings();
-  let response: ResponseInfo;
+  let response!: ResponseInfo;
   let parsedContent: unknown;
 
   const jsonSchema = z.toJSONSchema(schema);
 
-  if (promptEngineeringMode === 'native') {
-    response = await sendRawRequest(
-      profileId,
-      baseMessages,
-      maxResponseToken,
-      {
-        json_schema: { name: schemaName, strict: true, value: jsonSchema },
-      },
-      signal,
-    );
-    parsedContent = parseStructuredResponse(response, 'json', jsonSchema);
-  } else {
+  let format = promptEngineeringMode === 'native' ? undefined : promptEngineeringMode;
+  if (!format) {
+    const key = nativeModeKey(profileId);
+    if (nativeModeRejected.has(key)) {
+      format = 'json';
+    } else {
+      try {
+        response = await sendRawRequest(
+          profileId,
+          baseMessages,
+          maxResponseToken,
+          {
+            json_schema: { name: schemaName, strict: true, value: jsonSchema },
+          },
+          signal,
+        );
+        parsedContent = parseStructuredResponse(response, 'json', jsonSchema);
+      } catch (error) {
+        // ST turns the schema into provider-specific options, which some providers or models reject (e.g. Claude
+        // models that don't support a forced tool call). JSON mode asks for the same schema in the prompt.
+        if (!(error instanceof RequestError)) {
+          throw error;
+        }
+        nativeModeRejected.add(key);
+        st_echo(
+          'warning',
+          `Native mode failed, so JSON mode is used for this profile until the page is reloaded. ${error.message}`,
+        );
+        format = 'json';
+      }
+    }
+  }
+
+  if (format) {
     // Manual prompt engineering for JSON or XML
-    const format = promptEngineeringMode as 'json' | 'xml';
     const example = schemaToExample(jsonSchema, format);
     const schemaString = JSON.stringify(jsonSchema, null, 2);
     const promptTemplateKey = format === 'json' ? 'reviseJsonPrompt' : 'reviseXmlPrompt';

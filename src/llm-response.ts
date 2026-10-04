@@ -14,6 +14,8 @@ export interface ResponseInfo {
   finishReason?: string;
   /** True if the response stopped at the token limit. */
   truncated: boolean;
+  /** True if `truncated` was guessed from the text length because the response had no finish reason. */
+  truncationEstimated?: boolean;
   /** True if the model produced reasoning (thinking) for this response. */
   hasReasoning: boolean;
   /** The max response tokens sent with the request. */
@@ -45,7 +47,8 @@ export function readResponseInfo(json: any, text: string, maxTokens: number, str
     nonEmpty(choice?.message?.reasoning) ||
     nonEmpty(choice?.reasoning) ||
     nonEmpty(json?.thinking) ||
-    parts.some((part) => part?.type === 'thinking' && nonEmpty(part.thinking)) ||
+    // Claude returns thinking blocks without text unless a summary is requested, so the block itself counts.
+    parts.some((part) => part?.type === 'thinking' || part?.type === 'redacted_thinking') ||
     (json?.responseContent?.parts ?? []).some((part: any) => part?.thought && nonEmpty(part.text)) ||
     stripReasoningTags(text) !== text;
 
@@ -81,6 +84,12 @@ export function emptyResponseMessage(info: ResponseInfo): string {
       `The model returned no answer before hitting the ${info.maxTokens}-token limit. ` + `Raise "${MAX_TOKENS_LABEL}".`
     );
   }
+  if (info.finishReason === undefined && info.hasReasoning) {
+    return (
+      `The model returned no answer, and SillyTavern didn't report why it stopped. If thinking used up all ` +
+      `${info.maxTokens} response tokens, raise "${MAX_TOKENS_LABEL}" or turn thinking off.`
+    );
+  }
   return info.finishReason && !/^(stop|end_turn|stop_sequence|eos)$/i.test(info.finishReason)
     ? `The model returned an empty response (finish reason: ${info.finishReason}).`
     : 'The model returned an empty response.';
@@ -91,8 +100,8 @@ export function emptyResponseMessage(info: ResponseInfo): string {
  */
 export function truncatedResponseMessage(info: ResponseInfo, format: 'json' | 'xml'): string {
   return (
-    `The response was cut off at the ${info.maxTokens}-token limit, so it isn't complete ${format.toUpperCase()}. ` +
-    `Raise "${MAX_TOKENS_LABEL}".`
+    `The response was ${cutOff(info)} at the ${info.maxTokens}-token limit, so it isn't complete ` +
+    `${format.toUpperCase()}. Raise "${MAX_TOKENS_LABEL}".`
   );
 }
 
@@ -101,14 +110,18 @@ export function truncatedResponseMessage(info: ResponseInfo, format: 'json' | 'x
  */
 export function truncatedTextWarning(info: ResponseInfo): string {
   return (
-    `The response was cut off at the ${info.maxTokens}-token limit, so the text may be incomplete. ` +
+    `The response was ${cutOff(info)} at the ${info.maxTokens}-token limit, so the text may be incomplete. ` +
     `Raise "${MAX_TOKENS_LABEL}" for longer responses.`
   );
 }
 
+function cutOff(info: ResponseInfo): string {
+  return info.truncationEstimated ? 'probably cut off' : 'cut off';
+}
+
 /**
  * Gets the message of an error for display. ST wraps request errors as "API request failed" with the provider's
- * error as the cause, so the cause is shown too.
+ * error as the cause, so the cause is shown too (requests sent by CREC throw a RequestError that already does this).
  */
 export function getErrorMessage(error: any): string {
   const message = error?.message || String(error);
