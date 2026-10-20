@@ -4,7 +4,6 @@ import {
   DEFAULT_CHAR_CARD_DESCRIPTION,
   DEFAULT_CHAR_CARD_DEFINITION_TEMPLATE,
   DEFAULT_LOREBOOK_DEFINITION,
-  DEFAULT_NONE_FORMAT_DESC,
   DEFAULT_WORLD_INFO_CHARACTER_DEFINITION,
   DEFAULT_EXISTING_FIELDS_DEFINITION,
   DEFAULT_TASK_DESCRIPTION,
@@ -14,11 +13,16 @@ import {
   DEFAULT_REVISE_TASK_DESCRIPTION,
 } from './constants.js';
 import { globalContext } from './generate.js';
-import { migrateSettings, removeResponseFormatSettings, updateDefaultPrompts } from './settings-migration.js';
+import {
+  mergeOutputFormatPrompts,
+  migrateSettings,
+  removeResponseFormatSettings,
+  updateDefaultPrompts,
+} from './settings-migration.js';
 
 export const extensionName = 'SillyTavern-Character-Creator';
 export const VERSION = '0.5.0';
-export const FORMAT_VERSION = 'F_1.12';
+export const FORMAT_VERSION = 'F_1.13';
 
 export const KEYS = {
   EXTENSION: 'charCreator',
@@ -79,7 +83,6 @@ export interface ExtensionSettings {
     stDescription: PromptSetting;
     charDefinitions: PromptSetting;
     lorebookDefinitions: PromptSetting;
-    noneFormat: PromptSetting;
     worldInfoCharDefinition: PromptSetting;
     existingFieldDefinitions: PromptSetting;
     taskDescription: PromptSetting;
@@ -107,7 +110,6 @@ export type SystemPromptKey =
   | 'stDescription'
   | 'charDefinitions'
   | 'lorebookDefinitions'
-  | 'noneFormat'
   | 'worldInfoCharDefinition'
   | 'existingFieldDefinitions'
   | 'taskDescription'
@@ -120,7 +122,6 @@ export const SYSTEM_PROMPT_KEYS: Array<SystemPromptKey> = [
   'stDescription',
   'charDefinitions',
   'lorebookDefinitions',
-  'noneFormat',
   'worldInfoCharDefinition',
   'existingFieldDefinitions',
   'taskDescription',
@@ -135,7 +136,6 @@ export const DEFAULT_PROMPT_CONTENTS: Record<SystemPromptKey, string> = {
   stDescription: DEFAULT_CHAR_CARD_DESCRIPTION,
   charDefinitions: DEFAULT_CHAR_CARD_DEFINITION_TEMPLATE,
   lorebookDefinitions: DEFAULT_LOREBOOK_DEFINITION,
-  noneFormat: DEFAULT_NONE_FORMAT_DESC,
   worldInfoCharDefinition: DEFAULT_WORLD_INFO_CHARACTER_DEFINITION,
   existingFieldDefinitions: DEFAULT_EXISTING_FIELDS_DEFINITION,
   taskDescription: DEFAULT_TASK_DESCRIPTION,
@@ -186,11 +186,6 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
       content: DEFAULT_PROMPT_CONTENTS.lorebookDefinitions,
       isDefault: true,
       label: 'Lorebook Definition Template',
-    },
-    noneFormat: {
-      content: DEFAULT_PROMPT_CONTENTS.noneFormat,
-      isDefault: true,
-      label: 'Plain Text Format Description',
     },
     worldInfoCharDefinition: {
       content: DEFAULT_PROMPT_CONTENTS.worldInfoCharDefinition,
@@ -362,7 +357,7 @@ export async function initializeSettings(): Promise<void> {
                     label: 'Lorebook Definition Template',
                   },
                   noneFormat: {
-                    content: DEFAULT_PROMPT_CONTENTS.noneFormat,
+                    content: DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS,
                     isDefault: true,
                     label: 'Plain Text Format Description',
                   },
@@ -651,7 +646,7 @@ export async function initializeSettings(): Promise<void> {
               // Update the changed prompts if they were default
               return updateDefaultPrompts(previous, {
                 stDescription: DEFAULT_CHAR_CARD_DESCRIPTION,
-                noneFormat: DEFAULT_NONE_FORMAT_DESC,
+                noneFormat: DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS,
               });
             },
           },
@@ -660,6 +655,13 @@ export async function initializeSettings(): Promise<void> {
             to: 'F_1.12',
             action(previous: ExtensionSettings): ExtensionSettings {
               return removeResponseFormatSettings(previous);
+            },
+          },
+          {
+            from: 'F_1.12',
+            to: 'F_1.13',
+            action(previous: ExtensionSettings): ExtensionSettings {
+              return mergeOutputFormatPrompts(previous, DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS);
             },
           },
         ]),

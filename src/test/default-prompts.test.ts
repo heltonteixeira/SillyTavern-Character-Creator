@@ -1,15 +1,19 @@
 import { describe, expect, test } from 'vitest';
 import * as Handlebars from 'handlebars';
 import { z } from 'zod';
-import { DEFAULT_CHAR_CARD_DESCRIPTION, DEFAULT_NONE_FORMAT_DESC, DEFAULT_REVISE_JSON_PROMPT } from '../constants.js';
+import {
+  DEFAULT_CHAR_CARD_DESCRIPTION,
+  DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS,
+  DEFAULT_REVISE_JSON_PROMPT,
+} from '../constants.js';
 import { extractJson, parseFieldResponse } from '../parsers.js';
 import { schemaToExample } from '../schema-to-example.js';
 
 describe('default prompts', () => {
   test('the output format asks for the plain field text without code blocks', () => {
-    expect(DEFAULT_NONE_FORMAT_DESC).not.toContain('```');
-    expect(DEFAULT_NONE_FORMAT_DESC).not.toContain('triple backticks');
-    const example = DEFAULT_NONE_FORMAT_DESC.split('Example:\n')[1];
+    expect(DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS).not.toContain('```');
+    expect(DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS).not.toContain('triple backticks');
+    const example = DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS.split('Example:\n')[1];
     expect(parseFieldResponse(example)).toBe('Generated content for the field goes here.');
   });
 

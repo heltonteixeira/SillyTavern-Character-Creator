@@ -133,13 +133,11 @@ export const DEFAULT_CHAR_CARD_DEFINITION_TEMPLATE = `{{#if characters}}
 {{/each}}
 {{/if}}`;
 
-export const DEFAULT_NONE_FORMAT_DESC = `=== RESPONSE FORMAT INSTRUCTIONS ===
+export const DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS = `=== RESPONSE FORMAT INSTRUCTIONS ===
 You MUST provide ONLY the raw text content for the field, without any formatting, XML tags, JSON structure, or explanatory text. Just the content itself.
 
 Example:
 Generated content for the field goes here.`;
-
-export const DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS = '{{activeFormatInstructions}}';
 
 export const DEFAULT_LOREBOOK_DEFINITION = `{{#is_not_empty lorebooks}}
 ## Selected Lorebooks for Context

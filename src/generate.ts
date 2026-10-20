@@ -60,9 +60,6 @@ export interface RunCharacterFieldGenerationParams {
   allCharacters: Character[];
   entriesGroupByWorldName: Record<string, WIEntry[]>;
   promptSettings: typeof dumbSettings.prompts;
-  formatDescription: {
-    content: string;
-  };
   mainContextList: {
     promptName: string;
     role: MessageRole;
@@ -81,7 +78,6 @@ export async function runCharacterFieldGeneration({
   allCharacters,
   entriesGroupByWorldName,
   promptSettings,
-  formatDescription,
   mainContextList,
   includeUserMacro,
   maxResponseToken,
@@ -101,9 +97,6 @@ export async function runCharacterFieldGeneration({
   templateData['userInstructions'] = protectMacros(userPrompt.trim());
   templateData['fieldSpecificInstructions'] = protectMacros(
     session.draftFields[targetField]?.prompt ?? session.fields[targetField as CharacterFieldName]?.prompt,
-  );
-  templateData['activeFormatInstructions'] = Handlebars.compile(formatDescription.content, { noEscape: true })(
-    templateData,
   );
 
   // Add Definitions of Selected Characters (if enabled and characters selected)

@@ -75,3 +75,32 @@ export function removeResponseFormatSettings<T extends Record<string, any>>(sett
     prompts,
   } as unknown as T;
 }
+
+/**
+ * F_1.12 -> F_1.13: "Output Format Instructions" was only `{{activeFormatInstructions}}`, which pulled in the plain text
+ * format prompt (`noneFormat`). Its text now goes where that variable was, in every prompt that uses it, and `noneFormat`
+ * goes, from the templates too. Returns an updated copy.
+ */
+export function mergeOutputFormatPrompts<T extends Record<string, any>>(settings: T, defaultContent: string): T {
+  const { noneFormat, ...prompts } = settings.prompts ?? {};
+  const formatText: string = noneFormat?.content ?? defaultContent;
+  const variable = /\{\{\{?\s*activeFormatInstructions\s*\}?\}\}/g;
+  for (const [key, prompt] of Object.entries<any>(prompts)) {
+    if (typeof prompt?.content === 'string' && prompt.content.match(variable)) {
+      prompts[key] = { ...prompt, content: prompt.content.replace(variable, () => formatText) };
+    }
+  }
+  if (prompts.outputFormatInstructions) {
+    prompts.outputFormatInstructions = {
+      ...prompts.outputFormatInstructions,
+      isDefault: prompts.outputFormatInstructions.content === defaultContent,
+    };
+  }
+  const mainContextTemplatePresets = Object.fromEntries(
+    Object.entries<any>(settings.mainContextTemplatePresets ?? {}).map(([name, preset]) => [
+      name,
+      { ...preset, prompts: (preset.prompts ?? []).filter((p: any) => p.promptName !== 'noneFormat') },
+    ]),
+  );
+  return { ...settings, prompts, mainContextTemplatePresets } as T;
+}

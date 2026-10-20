@@ -273,7 +273,6 @@ export const MainPopup: FC = () => {
           allCharacters,
           entriesGroupByWorldName,
           promptSettings,
-          formatDescription: { content: settings.prompts.noneFormat.content },
           mainContextList: settings.mainContextTemplatePresets[settings.mainContextTemplatePreset].prompts.filter(
             (p) => p.enabled && (includeChatHistory || p.promptName !== 'chatHistory'),
           ),

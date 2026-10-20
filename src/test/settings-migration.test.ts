@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import { DEFAULT_CHAR_CARD_DESCRIPTION, DEFAULT_NONE_FORMAT_DESC } from '../constants.js';
+import { DEFAULT_CHAR_CARD_DESCRIPTION, DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS } from '../constants.js';
 import {
   compareFormatVersions,
+  mergeOutputFormatPrompts,
   migrateSettings,
   removeResponseFormatSettings,
   SettingsMigration,
@@ -53,7 +54,7 @@ describe('updating default prompts (F_1.10 -> F_1.11)', () => {
   // The XML/JSON format templates were updated here too; F_1.12 removes them.
   const newDefaults = {
     stDescription: DEFAULT_CHAR_CARD_DESCRIPTION,
-    noneFormat: DEFAULT_NONE_FORMAT_DESC,
+    noneFormat: DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS,
   };
   const f1_11: SettingsMigration = {
     from: 'F_1.10',
@@ -87,7 +88,7 @@ describe('updating default prompts (F_1.10 -> F_1.11)', () => {
       content: DEFAULT_CHAR_CARD_DESCRIPTION,
       isDefault: true,
     });
-    expect(result.prompts.noneFormat.content).toBe(DEFAULT_NONE_FORMAT_DESC);
+    expect(result.prompts.noneFormat.content).toBe(DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS);
     expect(result.prompts.xmlFormat).toEqual(settings.prompts.xmlFormat);
     expect(result.prompts.jsonFormat).toEqual(settings.prompts.jsonFormat);
     expect(result.prompts.reviseXmlPrompt).toEqual(settings.prompts.reviseXmlPrompt);
@@ -105,7 +106,7 @@ describe('updating default prompts (F_1.10 -> F_1.11)', () => {
     const result = await migrateSettings(makeSettings('F_1.10'), [f1_10, f1_11]);
 
     expect(result?.formatVersion).toBe('F_1.11');
-    expect(result?.prompts.noneFormat.content).toBe(DEFAULT_NONE_FORMAT_DESC);
+    expect(result?.prompts.noneFormat.content).toBe(DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS);
     expect(result?.prompts.jsonFormat.content).toBe('my custom JSON format');
     expect((result as any).steps).toBeUndefined();
   });
@@ -165,5 +166,62 @@ describe('removing the response format settings (F_1.11 -> F_1.12)', () => {
     const copy = structuredClone(settings);
     removeResponseFormatSettings(settings);
     expect(settings).toEqual(copy);
+  });
+});
+
+describe('merging the output format prompts (F_1.12 -> F_1.13)', () => {
+  const makeSettings = (noneFormat: string, outputFormat = '{{activeFormatInstructions}}') => ({
+    formatVersion: 'F_1.12',
+    prompts: {
+      noneFormat: { label: 'Plain Text Format Description', content: noneFormat, isDefault: false },
+      outputFormatInstructions: { label: 'Output Format Instructions', content: outputFormat, isDefault: true },
+      myPrompt: { label: 'Mine', content: 'Before\n{{ activeFormatInstructions }}\nAfter $& $1', isDefault: false },
+      taskDescription: { label: 'Task', content: 'task', isDefault: true },
+    },
+    mainContextTemplatePresets: {
+      default: {
+        prompts: [
+          { promptName: 'outputFormatInstructions', enabled: true, role: 'system' },
+          { promptName: 'noneFormat', enabled: false, role: 'system' },
+        ],
+      },
+    },
+  });
+
+  test('moves the plain text format into the prompts that used it and removes it', () => {
+    const settings = makeSettings('My format $1');
+    const result = mergeOutputFormatPrompts(settings, DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS);
+
+    expect(result.prompts).not.toHaveProperty('noneFormat');
+    expect(result.prompts.outputFormatInstructions).toEqual({
+      label: 'Output Format Instructions',
+      content: 'My format $1',
+      isDefault: false,
+    });
+    expect(result.prompts.myPrompt.content).toBe('Before\nMy format $1\nAfter $& $1');
+    expect(result.prompts.taskDescription).toEqual(settings.prompts.taskDescription);
+    expect(result.mainContextTemplatePresets.default.prompts.map((p) => p.promptName)).toEqual([
+      'outputFormatInstructions',
+    ]);
+    // The input is not modified
+    expect(settings).toEqual(makeSettings('My format $1'));
+  });
+
+  test('keeps the output format default when both prompts were default', () => {
+    const result = mergeOutputFormatPrompts(
+      makeSettings(DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS),
+      DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS,
+    );
+    expect(result.prompts.outputFormatInstructions.content).toBe(DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS);
+    expect(result.prompts.outputFormatInstructions.isDefault).toBe(true);
+  });
+
+  test('keeps an output format that no longer uses the variable', () => {
+    const result = mergeOutputFormatPrompts(
+      makeSettings('unused', 'My own format'),
+      DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS,
+    );
+    expect(result.prompts.outputFormatInstructions.content).toBe('My own format');
+    expect(result.prompts.outputFormatInstructions.isDefault).toBe(false);
   });
 });
