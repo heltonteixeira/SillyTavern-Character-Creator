@@ -1030,7 +1030,7 @@ function X_() {
   function Ze() {
     le(fe), le(je), le(V);
   }
-  function Ke(e) {
+  function $e(e) {
     e.memoizedState !== null && ie(me, e);
     var t = fe.current, a = hg(t, e.type);
     t !== a && (ie(je, e), ie(fe, a));
@@ -5075,7 +5075,7 @@ Error generating stack: ` + a.message + `
         break;
       case 27:
       case 5:
-        Ke(t);
+        $e(t);
         break;
       case 4:
         we(t, t.stateNode.containerInfo);
@@ -5291,7 +5291,7 @@ Error generating stack: ` + a.message + `
           e.memoizedState
         ), null;
       case 27:
-        return Ke(t), e === null && Ie && (s = t.stateNode = vg(
+        return $e(t), e === null && Ie && (s = t.stateNode = vg(
           t.type,
           t.pendingProps,
           V.current
@@ -5311,7 +5311,7 @@ Error generating stack: ` + a.message + `
           Rn
         ), s !== null ? (t.stateNode = s, Lt = t, lt = Cn(
           s.firstChild
-        ), Rn = !1, u = !0) : u = !1), u || Wr(t)), Ke(t), u = t.type, d = t.pendingProps, E = e !== null ? e.memoizedProps : null, s = d.children, _f(u, d) ? s = null : E !== null && _f(u, E) && (t.flags |= 32), t.memoizedState !== null && (u = vc(
+        ), Rn = !1, u = !0) : u = !1), u || Wr(t)), $e(t), u = t.type, d = t.pendingProps, E = e !== null ? e.memoizedProps : null, s = d.children, _f(u, d) ? s = null : E !== null && _f(u, E) && (t.flags |= 32), t.memoizedState !== null && (u = vc(
           e,
           t,
           M2,
@@ -5756,7 +5756,7 @@ Error generating stack: ` + a.message + `
         } while (a !== u);
       }
     } catch (O) {
-      $e(t, t.return, O);
+      Ke(t, t.return, O);
     }
   }
   function xr(e, t, a) {
@@ -5774,7 +5774,7 @@ Error generating stack: ` + a.message + `
               try {
                 P();
               } catch (F) {
-                $e(
+                Ke(
                   u,
                   k,
                   F
@@ -5786,7 +5786,7 @@ Error generating stack: ` + a.message + `
         } while (s !== d);
       }
     } catch (F) {
-      $e(t, t.return, F);
+      Ke(t, t.return, F);
     }
   }
   function _m(e) {
@@ -5796,7 +5796,7 @@ Error generating stack: ` + a.message + `
       try {
         lp(t, a);
       } catch (s) {
-        $e(e, e.return, s);
+        Ke(e, e.return, s);
       }
     }
   }
@@ -5808,7 +5808,7 @@ Error generating stack: ` + a.message + `
     try {
       a.componentWillUnmount();
     } catch (s) {
-      $e(e, t, s);
+      Ke(e, t, s);
     }
   }
   function el(e, t) {
@@ -5830,7 +5830,7 @@ Error generating stack: ` + a.message + `
         typeof a == "function" ? e.refCleanup = a(s) : a.current = s;
       }
     } catch (u) {
-      $e(e, t, u);
+      Ke(e, t, u);
     }
   }
   function zn(e, t) {
@@ -5840,7 +5840,7 @@ Error generating stack: ` + a.message + `
         try {
           s();
         } catch (u) {
-          $e(e, t, u);
+          Ke(e, t, u);
         } finally {
           e.refCleanup = null, e = e.alternate, e != null && (e.refCleanup = null);
         }
@@ -5848,7 +5848,7 @@ Error generating stack: ` + a.message + `
         try {
           a(null);
         } catch (u) {
-          $e(e, t, u);
+          Ke(e, t, u);
         }
       else a.current = null;
   }
@@ -5866,7 +5866,7 @@ Error generating stack: ` + a.message + `
           a.src ? s.src = a.src : a.srcSet && (s.srcset = a.srcSet);
       }
     } catch (u) {
-      $e(e, e.return, u);
+      Ke(e, e.return, u);
     }
   }
   function Zc(e, t, a) {
@@ -5874,7 +5874,7 @@ Error generating stack: ` + a.message + `
       var s = e.stateNode;
       o_(s, e.type, a, t), s[Ut] = t;
     } catch (u) {
-      $e(e, e.return, u);
+      Ke(e, e.return, u);
     }
   }
   function xm(e) {
@@ -5916,7 +5916,7 @@ Error generating stack: ` + a.message + `
         t.removeAttributeNode(u[0]);
       Ot(t, s, a), t[Mt] = e, t[Ut] = a;
     } catch (d) {
-      $e(e, e.return, d);
+      Ke(e, e.return, d);
     }
   }
   var er = !1, ft = !1, Vc = !1, Cm = typeof WeakSet == "function" ? WeakSet : Set, wt = null;
@@ -5982,7 +5982,7 @@ Error generating stack: ` + a.message + `
                     d
                   ), s.__reactInternalSnapshotBeforeUpdate = e;
                 } catch (ge) {
-                  $e(
+                  Ke(
                     a,
                     a.return,
                     ge
@@ -6037,7 +6037,7 @@ Error generating stack: ` + a.message + `
             try {
               e.componentDidMount();
             } catch (E) {
-              $e(a, a.return, E);
+              Ke(a, a.return, E);
             }
           else {
             var u = aa(
@@ -6052,7 +6052,7 @@ Error generating stack: ` + a.message + `
                 e.__reactInternalSnapshotBeforeUpdate
               );
             } catch (E) {
-              $e(
+              Ke(
                 a,
                 a.return,
                 E
@@ -6075,7 +6075,7 @@ Error generating stack: ` + a.message + `
           try {
             lp(e, t);
           } catch (E) {
-            $e(a, a.return, E);
+            Ke(a, a.return, E);
           }
         }
         break;
@@ -6155,7 +6155,7 @@ Error generating stack: ` + a.message + `
             try {
               (et.nodeType === 9 ? et.body : et.nodeName === "HTML" ? et.ownerDocument.body : et).removeChild(a.stateNode);
             } catch (d) {
-              $e(
+              Ke(
                 a,
                 t,
                 d
@@ -6165,7 +6165,7 @@ Error generating stack: ` + a.message + `
             try {
               et.removeChild(a.stateNode);
             } catch (d) {
-              $e(
+              Ke(
                 a,
                 t,
                 d
@@ -6233,7 +6233,7 @@ Error generating stack: ` + a.message + `
       try {
         vl(e);
       } catch (a) {
-        $e(t, t.return, a);
+        Ke(t, t.return, a);
       }
   }
   function Z2(e) {
@@ -6390,7 +6390,7 @@ Error generating stack: ` + a.message + `
           try {
             Ta(u, "");
           } catch (Z) {
-            $e(e, e.return, Z);
+            Ke(e, e.return, Z);
           }
         }
         s & 4 && e.stateNode != null && (u = e.memoizedProps, Zc(
@@ -6407,7 +6407,7 @@ Error generating stack: ` + a.message + `
           try {
             a.nodeValue = s;
           } catch (Z) {
-            $e(e, e.return, Z);
+            Ke(e, e.return, Z);
           }
         }
         break;
@@ -6416,7 +6416,7 @@ Error generating stack: ` + a.message + `
           try {
             vl(t.containerInfo);
           } catch (Z) {
-            $e(e, e.return, Z);
+            Ke(e, e.return, Z);
           }
         Vc && (Vc = !1, Nm(e));
         break;
@@ -6448,7 +6448,7 @@ Error generating stack: ` + a.message + `
                     O.style.display = I == null || typeof I == "boolean" ? "" : ("" + I).trim();
                   }
                 } catch (Z) {
-                  $e(k, k.return, Z);
+                  Ke(k, k.return, Z);
                 }
               }
             } else if (t.tag === 6) {
@@ -6457,7 +6457,7 @@ Error generating stack: ` + a.message + `
                 try {
                   k.stateNode.nodeValue = u ? "" : k.memoizedProps;
                 } catch (Z) {
-                  $e(k, k.return, Z);
+                  Ke(k, k.return, Z);
                 }
               }
             } else if ((t.tag !== 22 && t.tag !== 23 || t.memoizedState === null || t === e) && t.child !== null) {
@@ -6520,7 +6520,7 @@ Error generating stack: ` + a.message + `
             throw Error(l(161));
         }
       } catch (F) {
-        $e(e, e.return, F);
+        Ke(e, e.return, F);
       }
       e.flags &= -3;
     }
@@ -6597,7 +6597,7 @@ Error generating stack: ` + a.message + `
             try {
               u.componentDidMount();
             } catch (P) {
-              $e(s, s.return, P);
+              Ke(s, s.return, P);
             }
           if (s = d, u = s.updateQueue, u !== null) {
             var O = s.stateNode;
@@ -6607,7 +6607,7 @@ Error generating stack: ` + a.message + `
                 for (u.shared.hiddenCallbacks = null, u = 0; u < k.length; u++)
                   ip(k[u], O);
             } catch (P) {
-              $e(s, s.return, P);
+              Ke(s, s.return, P);
             }
           }
           a && E & 64 && _m(d), el(d, d.return);
@@ -6718,7 +6718,7 @@ Error generating stack: ` + a.message + `
               -0
             );
           } catch (k) {
-            $e(t, t.return, k);
+            Ke(t, t.return, k);
           }
         } else
           Ln(
@@ -7664,7 +7664,7 @@ Error generating stack: ` + a.message + `
   function Jm(e, t, a) {
     t = fn(a, t), t = jc(e.stateNode, t, 2), e = yr(e, t, 2), e !== null && (Ei(e, 2), Bn(e));
   }
-  function $e(e, t, a) {
+  function Ke(e, t, a) {
     if (e.tag === 3)
       Jm(e, e, a);
     else
@@ -22050,8 +22050,8 @@ const vw = (n, r) => {
     (V, me, we) => {
       if (JSON.stringify(we) === JSON.stringify(me))
         return V;
-      const Ke = vt.getSettings().prompts.existingFieldDefinitions;
-      if (!Ke) return V;
+      const $e = vt.getSettings().prompts.existingFieldDefinitions;
+      if (!$e) return V;
       const Ve = { core: {}, alternate_greetings: {}, draft: {} }, U = {}, re = {};
       if ((/* @__PURE__ */ new Set([...Object.keys(we.fields), ...Object.keys(me.fields)])).forEach((Ae) => {
         const zt = we.fields[Ae]?.value ?? "", Mn = me.fields[Ae]?.value ?? "";
@@ -22070,7 +22070,7 @@ const vw = (n, r) => {
       const qe = {
         fields: gt(Ve),
         fieldList: gt(fu(U, re))
-      }, ve = Pl(Ke.content, qe, Fo.substituteParams);
+      }, ve = Pl($e.content, qe, Fo.substituteParams);
       if (ve.trim()) {
         const Ae = {
           id: `msg-${Date.now()}-state`,
@@ -22085,7 +22085,7 @@ const vw = (n, r) => {
     []
   ), Y = ee.useCallback(
     async (V, me, we, Ze) => {
-      const Ke = vt.getSettings();
+      const $e = vt.getSettings();
       if (!n.profileId) {
         _e("warning", "Please select a connection profile for this session.");
         return;
@@ -22097,10 +22097,10 @@ const vw = (n, r) => {
           qe.findIndex((ve) => ve.id === Th),
           {
             selection: c,
-            contextSize: i1(Ve, Ke),
-            maxResponseTokens: Ke.maxResponseToken
+            contextSize: i1(Ve, $e),
+            maxResponseTokens: $e.maxResponseToken
           }
-        ), ne = V.slice(0, V.length - (me ? 0 : 1)).reverse().find((qe) => qe.stateSnapshot)?.stateSnapshot ?? o, Te = Ke.prompts.existingFieldDefinitions;
+        ), ne = V.slice(0, V.length - (me ? 0 : 1)).reverse().find((qe) => qe.stateSnapshot)?.stateSnapshot ?? o, Te = $e.prompts.existingFieldDefinitions;
         if (Te) {
           const qe = {
             fields: gt({
@@ -22132,7 +22132,7 @@ const vw = (n, r) => {
           const qe = await S4(
             n.profileId,
             await re(U),
-            Ke.maxResponseToken,
+            $e.maxResponseToken,
             R.current.signal
           ), ve = {
             id: `msg-${Date.now()}-ai`,
@@ -22149,7 +22149,7 @@ const vw = (n, r) => {
             await re(U),
             qe,
             n.type === "field" ? Py.FIELD : Py.GLOBAL,
-            Ke.maxResponseToken,
+            $e.maxResponseToken,
             R.current.signal
           ), zt = hw(ne, Ae, n.type, n.targetFieldId), Mn = {
             id: `msg-${Date.now()}-ai`,
@@ -22169,14 +22169,17 @@ const vw = (n, r) => {
     [n, l, o, c, q]
   ), G = ee.useCallback(async () => {
     if (!g.trim() || _) return;
-    const V = { id: `msg-${Date.now()}`, role: "user", content: g.trim() }, me = h;
+    const V = { id: `msg-${Date.now()}`, role: "user", content: g.trim() }, me = h, we = g;
     Y(
       [...h, V],
       !1,
       () => {
         m([...h, V]), v("");
       },
-      () => m(me)
+      // Put the message back in the input so it can be sent again.
+      () => {
+        m(me), v(we);
+      }
     );
   }, [g, _, h, Y]), X = ee.useCallback(async () => {
     if (_ || h.length === 0) return;
@@ -22193,13 +22196,13 @@ const vw = (n, r) => {
     const V = h.slice().reverse().find((me) => me.stateSnapshot)?.stateSnapshot ?? o;
     i(V), r();
   }, oe = (V) => {
-    const me = h.findIndex((Ke) => Ke.id === V);
+    const me = h.findIndex(($e) => $e.id === V);
     if (me === -1 || !h[me].stateSnapshot) return;
     const we = h[me].stateSnapshot;
     let Ze = o;
-    for (let Ke = me - 1; Ke >= 0; Ke--)
-      if (h[Ke].stateSnapshot) {
-        Ze = h[Ke].stateSnapshot;
+    for (let $e = me - 1; $e >= 0; $e--)
+      if (h[$e].stateSnapshot) {
+        Ze = h[$e].stateSnapshot;
         break;
       }
     p({ before: Ze, after: we });
@@ -22211,17 +22214,20 @@ const vw = (n, r) => {
     N(null), D("");
   }, te = async () => {
     if (!w) return;
-    const V = h.findIndex((U) => U.id === w);
+    const V = h.findIndex((re) => re.id === w);
     if (V === -1 || !await Fo.Popup.show.confirm(
       "Edit Message",
       "This will fork the conversation from this point, removing all subsequent messages. Continue?"
     )) return;
-    const we = h, Ze = h.slice(0, V), Ke = { ...h[V], content: x }, Ve = [...Ze, Ke];
+    const we = h, Ze = h.slice(0, V), $e = { ...h[V], content: x }, Ve = [...Ze, $e], U = x;
     H(), Y(
       Ve,
       !1,
       () => m(Ve),
-      () => m(we)
+      // Reopen the editor with the edited text so it can be saved again.
+      () => {
+        m(we), N($e.id), D(U);
+      }
     );
   }, ue = async (V) => {
     const me = h.findIndex((U) => U.id === V);
@@ -22236,7 +22242,7 @@ const vw = (n, r) => {
   }, Le = h.filter((V) => !V.isStateUpdate), j = Le.filter((V) => V.isInitial), J = Le.filter((V) => !V.isInitial), le = h.slice().reverse().find((V) => V.stateSnapshot)?.stateSnapshot ?? o, ie = () => {
     T(!0);
   }, fe = (V) => {
-    const me = h.slice().reverse().find((Ke) => Ke.stateSnapshot)?.stateSnapshot ?? o, we = {
+    const me = h.slice().reverse().find(($e) => $e.stateSnapshot)?.stateSnapshot ?? o, we = {
       id: `msg-${Date.now()}-user-edit`,
       role: "user",
       content: "I made a change.",
@@ -22948,7 +22954,7 @@ const Un = SillyTavern.getContext(), sh = () => ({
   ), Ze = ee.useMemo(
     () => Mw(y, i.selectedWorldNames),
     [y, i.selectedWorldNames]
-  ), Ke = ee.useMemo(
+  ), $e = ee.useMemo(
     () => Object.keys(r.promptPresets).map((U) => ({ value: U, label: U })),
     [r.promptPresets]
   ), Ve = ee.useMemo(
@@ -23222,7 +23228,7 @@ const Un = SillyTavern.getContext(), sh = () => ({
             du,
             {
               label: "Prompt Preset",
-              items: Ke,
+              items: $e,
               value: r.promptPreset,
               onChange: (U) => M("promptPreset", U ?? "default"),
               onItemsChange: (U) => M(

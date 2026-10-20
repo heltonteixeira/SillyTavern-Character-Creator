@@ -401,6 +401,7 @@ export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
     if (!userInput.trim() || isLoading) return;
     const userMessage: ReviseMessage = { id: `msg-${Date.now()}`, role: 'user', content: userInput.trim() };
     const previousMessages = messages;
+    const previousInput = userInput;
     sendRequest(
       [...messages, userMessage],
       false,
@@ -408,7 +409,11 @@ export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
         setMessages([...messages, userMessage]);
         setUserInput('');
       },
-      () => setMessages(previousMessages),
+      // Put the message back in the input so it can be sent again.
+      () => {
+        setMessages(previousMessages);
+        setUserInput(previousInput);
+      },
     );
   }, [userInput, isLoading, messages, sendRequest]);
 
@@ -494,6 +499,7 @@ export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
     const truncatedMessages = messages.slice(0, messageIndex);
     const editedMessage = { ...messages[messageIndex], content: editingContent };
     const messagesForRequest = [...truncatedMessages, editedMessage];
+    const editedContent = editingContent;
 
     handleCancelEdit();
 
@@ -501,7 +507,12 @@ export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
       messagesForRequest,
       false,
       () => setMessages(messagesForRequest),
-      () => setMessages(previousMessages),
+      // Reopen the editor with the edited text so it can be saved again.
+      () => {
+        setMessages(previousMessages);
+        setEditingMessageId(editedMessage.id);
+        setEditingContent(editedContent);
+      },
     );
   };
 
