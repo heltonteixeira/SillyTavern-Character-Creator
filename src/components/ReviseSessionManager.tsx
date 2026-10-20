@@ -4,8 +4,7 @@ import { STButton } from 'sillytavern-utils-lib/components/react';
 import { ReviseSessionChat } from './ReviseSessionChat.js';
 import { ExtensionSettings, settingsManager } from '../settings.js';
 import { buildInitialReviseMessages } from '../revise-prompt-builder.js';
-import { selected_group, st_echo, this_chid } from 'sillytavern-utils-lib/config';
-import { BuildPromptOptions } from 'sillytavern-utils-lib';
+import { st_echo } from 'sillytavern-utils-lib/config';
 import { Session } from '../generate.js';
 import { loadReviseSessions, saveReviseSessions } from '../browser-storage.js';
 
@@ -102,7 +101,6 @@ export const ReviseSessionManager: FC<ReviseSessionManagerProps> = ({
           mainContextTemplatePreset: currentSettings.mainContextTemplatePreset,
         },
         profileId: currentSettings.profileId,
-        promptEngineeringMode: currentSettings.defaultPromptEngineeringMode,
         isReadonly: false,
       };
 
@@ -147,49 +145,6 @@ export const ReviseSessionManager: FC<ReviseSessionManagerProps> = ({
   };
 
   if (activeSession) {
-    const profile = globalContext.extensionSettings.connectionManager?.profiles?.find(
-      (p: any) => p.id === activeSession.profileId,
-    );
-    const chatContextOptions: BuildPromptOptions = {
-      targetCharacterId: this_chid,
-      ignoreCharacterFields: true,
-      ignoreWorldInfo: true,
-      ignoreAuthorNote: true,
-      includeNames: !!selected_group,
-      presetName: profile?.preset,
-      contextName: profile?.context,
-      instructName: profile?.instruct,
-    };
-
-    const msgContext = contextToSend.messages;
-    switch (msgContext.type) {
-      case 'none':
-        chatContextOptions.messageIndexesBetween = { start: -1, end: -1 };
-        break;
-      case 'first':
-        chatContextOptions.messageIndexesBetween = { start: 0, end: msgContext.first ?? 10 };
-        break;
-      case 'last':
-        const chatLength = globalContext.chat?.length ?? 0;
-        const lastCount = msgContext.last ?? 10;
-        chatContextOptions.messageIndexesBetween = {
-          end: Math.max(0, chatLength - 1),
-          start: Math.max(0, chatLength - lastCount),
-        };
-        break;
-      case 'range':
-        chatContextOptions.messageIndexesBetween = {
-          start: msgContext.range?.start ?? 0,
-          end: msgContext.range?.end ?? 10,
-        };
-        break;
-      case 'all':
-      default:
-        break;
-    }
-    if (this_chid === undefined && !selected_group) {
-      chatContextOptions.messageIndexesBetween = { start: -1, end: -1 };
-    }
     return (
       <ReviseSessionChat
         session={activeSession}
@@ -197,7 +152,7 @@ export const ReviseSessionManager: FC<ReviseSessionManagerProps> = ({
         onApply={onApply}
         onSessionUpdate={handleSessionUpdate}
         initialState={initialState}
-        chatContextOptions={chatContextOptions}
+        messageSelection={contextToSend.messages}
       />
     );
   }

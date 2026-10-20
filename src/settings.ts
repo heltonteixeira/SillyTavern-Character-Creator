@@ -4,8 +4,6 @@ import {
   DEFAULT_CHAR_CARD_DESCRIPTION,
   DEFAULT_CHAR_CARD_DEFINITION_TEMPLATE,
   DEFAULT_LOREBOOK_DEFINITION,
-  DEFAULT_XML_FORMAT_DESC,
-  DEFAULT_JSON_FORMAT_DESC,
   DEFAULT_NONE_FORMAT_DESC,
   DEFAULT_WORLD_INFO_CHARACTER_DEFINITION,
   DEFAULT_EXISTING_FIELDS_DEFINITION,
@@ -13,15 +11,14 @@ import {
   DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS,
   DEFAULT_PERSONA_DESCRIPTION,
   DEFAULT_REVISE_JSON_PROMPT,
-  DEFAULT_REVISE_XML_PROMPT,
   DEFAULT_REVISE_TASK_DESCRIPTION,
 } from './constants.js';
 import { globalContext } from './generate.js';
-import { migrateSettings, updateDefaultPrompts } from './settings-migration.js';
+import { migrateSettings, removeResponseFormatSettings, updateDefaultPrompts } from './settings-migration.js';
 
 export const extensionName = 'SillyTavern-Character-Creator';
-export const VERSION = '0.4.0';
-export const FORMAT_VERSION = 'F_1.11';
+export const VERSION = '0.5.0';
+export const FORMAT_VERSION = 'F_1.12';
 
 export const KEYS = {
   EXTENSION: 'charCreator',
@@ -67,27 +64,21 @@ export interface MainContextTemplatePreset {
   prompts: MainContextPromptBlock[];
 }
 
-export type OutputFormat = 'xml' | 'json' | 'none';
-export type PromptEngineeringMode = 'native' | 'json' | 'xml';
-
 export interface ExtensionSettings {
   version: string;
   formatVersion: string;
   profileId: string;
-  maxContextType: 'profile' | 'sampler' | 'custom';
+  /** `profile`: the context size of the profile's preset */
+  maxContextType: 'profile' | 'custom';
   maxContextValue: number;
   maxResponseToken: number;
-  outputFormat: OutputFormat;
   contextToSend: ContextToSend;
-  defaultPromptEngineeringMode: PromptEngineeringMode;
 
   // Consolidated system prompts
   prompts: {
     stDescription: PromptSetting;
     charDefinitions: PromptSetting;
     lorebookDefinitions: PromptSetting;
-    xmlFormat: PromptSetting;
-    jsonFormat: PromptSetting;
     noneFormat: PromptSetting;
     worldInfoCharDefinition: PromptSetting;
     existingFieldDefinitions: PromptSetting;
@@ -95,7 +86,6 @@ export interface ExtensionSettings {
     outputFormatInstructions: PromptSetting;
     personaDescription: PromptSetting;
     reviseJsonPrompt: PromptSetting;
-    reviseXmlPrompt: PromptSetting;
     reviseTaskDescription: PromptSetting;
     [key: string]: PromptSetting;
   };
@@ -117,8 +107,6 @@ export type SystemPromptKey =
   | 'stDescription'
   | 'charDefinitions'
   | 'lorebookDefinitions'
-  | 'xmlFormat'
-  | 'jsonFormat'
   | 'noneFormat'
   | 'worldInfoCharDefinition'
   | 'existingFieldDefinitions'
@@ -126,15 +114,12 @@ export type SystemPromptKey =
   | 'outputFormatInstructions'
   | 'personaDescription'
   | 'reviseJsonPrompt'
-  | 'reviseXmlPrompt'
   | 'reviseTaskDescription';
 
 export const SYSTEM_PROMPT_KEYS: Array<SystemPromptKey> = [
   'stDescription',
   'charDefinitions',
   'lorebookDefinitions',
-  'xmlFormat',
-  'jsonFormat',
   'noneFormat',
   'worldInfoCharDefinition',
   'existingFieldDefinitions',
@@ -142,7 +127,6 @@ export const SYSTEM_PROMPT_KEYS: Array<SystemPromptKey> = [
   'outputFormatInstructions',
   'personaDescription',
   'reviseJsonPrompt',
-  'reviseXmlPrompt',
   'reviseTaskDescription',
 ];
 
@@ -151,8 +135,6 @@ export const DEFAULT_PROMPT_CONTENTS: Record<SystemPromptKey, string> = {
   stDescription: DEFAULT_CHAR_CARD_DESCRIPTION,
   charDefinitions: DEFAULT_CHAR_CARD_DEFINITION_TEMPLATE,
   lorebookDefinitions: DEFAULT_LOREBOOK_DEFINITION,
-  xmlFormat: DEFAULT_XML_FORMAT_DESC,
-  jsonFormat: DEFAULT_JSON_FORMAT_DESC,
   noneFormat: DEFAULT_NONE_FORMAT_DESC,
   worldInfoCharDefinition: DEFAULT_WORLD_INFO_CHARACTER_DEFINITION,
   existingFieldDefinitions: DEFAULT_EXISTING_FIELDS_DEFINITION,
@@ -160,7 +142,6 @@ export const DEFAULT_PROMPT_CONTENTS: Record<SystemPromptKey, string> = {
   outputFormatInstructions: DEFAULT_OUTPUT_FORMAT_INSTRUCTIONS,
   personaDescription: DEFAULT_PERSONA_DESCRIPTION,
   reviseJsonPrompt: DEFAULT_REVISE_JSON_PROMPT,
-  reviseXmlPrompt: DEFAULT_REVISE_XML_PROMPT,
   reviseTaskDescription: DEFAULT_REVISE_TASK_DESCRIPTION,
 };
 
@@ -171,7 +152,6 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   maxContextType: 'profile',
   maxContextValue: 16384,
   maxResponseToken: 1024,
-  outputFormat: 'xml',
   contextToSend: {
     stDescription: true,
     messages: {
@@ -189,7 +169,6 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
     persona: true,
     dontSendOtherGreetings: false,
   },
-  defaultPromptEngineeringMode: 'native',
 
   // Updated prompts structure
   prompts: {
@@ -207,16 +186,6 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
       content: DEFAULT_PROMPT_CONTENTS.lorebookDefinitions,
       isDefault: true,
       label: 'Lorebook Definition Template',
-    },
-    xmlFormat: {
-      content: DEFAULT_PROMPT_CONTENTS.xmlFormat,
-      isDefault: true,
-      label: 'XML Format Description',
-    },
-    jsonFormat: {
-      content: DEFAULT_PROMPT_CONTENTS.jsonFormat,
-      isDefault: true,
-      label: 'JSON Format Description',
     },
     noneFormat: {
       content: DEFAULT_PROMPT_CONTENTS.noneFormat,
@@ -252,11 +221,6 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
       content: DEFAULT_PROMPT_CONTENTS.reviseJsonPrompt,
       isDefault: true,
       label: 'Revise Session (JSON Mode)',
-    },
-    reviseXmlPrompt: {
-      content: DEFAULT_PROMPT_CONTENTS.reviseXmlPrompt,
-      isDefault: true,
-      label: 'Revise Session (XML Mode)',
     },
     reviseTaskDescription: {
       content: DEFAULT_PROMPT_CONTENTS.reviseTaskDescription,
@@ -375,7 +339,6 @@ export async function initializeSettings(): Promise<void> {
                 maxContextType: previous?.maxContextType ?? 'profile',
                 maxContextValue: previous?.maxContextValue ?? 16384,
                 maxResponseToken: previous?.maxResponseToken ?? 1024,
-                outputFormat: previous?.outputFormat ?? 'xml',
                 contextToSend: {
                   ...previous?.contextToSend,
                   persona: true,
@@ -397,16 +360,6 @@ export async function initializeSettings(): Promise<void> {
                     content: DEFAULT_PROMPT_CONTENTS.lorebookDefinitions,
                     isDefault: true,
                     label: 'Lorebook Definition Template',
-                  },
-                  xmlFormat: {
-                    content: DEFAULT_PROMPT_CONTENTS.xmlFormat,
-                    isDefault: true,
-                    label: 'XML Format Description',
-                  },
-                  jsonFormat: {
-                    content: DEFAULT_PROMPT_CONTENTS.jsonFormat,
-                    isDefault: true,
-                    label: 'JSON Format Description',
                   },
                   noneFormat: {
                     content: DEFAULT_PROMPT_CONTENTS.noneFormat,
@@ -630,7 +583,6 @@ export async function initializeSettings(): Promise<void> {
             action(previous: ExtensionSettings): ExtensionSettings {
               const response = {
                 ...previous,
-                defaultPromptEngineeringMode: 'native',
               } as ExtensionSettings;
 
               if (!response.prompts) response.prompts = {} as any;
@@ -638,11 +590,6 @@ export async function initializeSettings(): Promise<void> {
                 content: DEFAULT_PROMPT_CONTENTS.reviseJsonPrompt,
                 isDefault: true,
                 label: 'Revise Session (JSON Mode)',
-              };
-              response.prompts.reviseXmlPrompt = {
-                content: DEFAULT_PROMPT_CONTENTS.reviseXmlPrompt,
-                isDefault: true,
-                label: 'Revise Session (XML Mode)',
               };
               response.prompts.reviseTaskDescription = {
                 content: DEFAULT_PROMPT_CONTENTS.reviseTaskDescription,
@@ -704,11 +651,15 @@ export async function initializeSettings(): Promise<void> {
               // Update the changed prompts if they were default
               return updateDefaultPrompts(previous, {
                 stDescription: DEFAULT_CHAR_CARD_DESCRIPTION,
-                xmlFormat: DEFAULT_XML_FORMAT_DESC,
-                jsonFormat: DEFAULT_JSON_FORMAT_DESC,
                 noneFormat: DEFAULT_NONE_FORMAT_DESC,
-                reviseXmlPrompt: DEFAULT_REVISE_XML_PROMPT,
               });
+            },
+          },
+          {
+            from: 'F_1.11',
+            to: 'F_1.12',
+            action(previous: ExtensionSettings): ExtensionSettings {
+              return removeResponseFormatSettings(previous);
             },
           },
         ]),

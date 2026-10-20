@@ -12,9 +12,17 @@ A [SillyTavern](https://docs.sillytavern.app/) extension that helps you create c
 
 ---
 
-**If you are using a _Text Completion_ profile, make sure your profile contains API, preset, model, and instruct.**
+### What CREC takes from a connection profile
 
-**If you are using a _Chat Completion_ profile; API, settings, model would be enough.**
+The profile decides **where a request goes and how it is sampled**; CREC decides **what is sent**.
+
+- **Used:** API, model, server URL, secret, proxy, prompt post-processing, the settings preset's **samplers** (temperature, top P, reasoning effort, context size, ...), the instruct template (Text Completion), and the reasoning template (to remove reasoning from replies).
+- **Not used:** the preset's prompts (Main Prompt, jailbreak, NSFW, ...), stop strings, Start Reply With, and the regex preset. Every prompt comes from CREC's own templates, so any profile can be used, including ones with roleplay presets.
+- **Chat history:** when messages are included, only the chat messages are sent, without other extensions' prompts.
+
+**Text Completion profiles need an API, preset, model, and instruct template. For Chat Completion profiles, the API and model are enough** (a preset is optional and only adds its samplers).
+
+Fields are generated as plain text. Revise sessions ask for JSON matching a schema: natively when the provider supports it, otherwise in the prompt ("Revise Session (JSON Mode)" template). CREC switches automatically and remembers the choice per profile until the page is reloaded.
 
 ---
 
@@ -44,7 +52,7 @@ https://github.com/user-attachments/assets/d8db5d82-fa8e-4332-97e6-43f8529b7f60
 
 >Can I use this with my local 8B/12B RP model?
 
-Most likely, yes. If you can't, try changing _Output Format_.
+Most likely, yes. Fields are plain text, which small models handle well. Revise sessions need a model that can write JSON.
 
 >Can you suggest a model?
 

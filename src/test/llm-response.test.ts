@@ -45,17 +45,16 @@ describe('revise requests', () => {
     sendRequest.mockReset();
     stEcho.mockReset();
     mockSettings.prompts.reviseJsonPrompt = { label: 'JSON', content: '{{example_response}}' };
-    mockSettings.prompts.reviseXmlPrompt = { label: 'XML', content: '{{example_response}}' };
   });
 
-  function request(mode: 'native' | 'json' | 'xml', signal?: AbortSignal) {
-    return makeStructuredRequest('profile', [], FieldSpecificResponseSchema, 'FieldRevision', mode, 1024, signal);
+  function request(signal?: AbortSignal, profileId = 'profile') {
+    return makeStructuredRequest(profileId, [], FieldSpecificResponseSchema, 'FieldRevision', 1024, signal);
   }
 
   test('asks ST for the raw response', async () => {
     sendRequest.mockResolvedValue(openAiResponse(JSON.stringify(fieldReply)));
     const signal = new AbortController().signal;
-    await expect(request('native', signal)).resolves.toEqual(fieldReply);
+    await expect(request(signal)).resolves.toEqual(fieldReply);
     expect(sendRequest).toHaveBeenCalledWith(
       'profile',
       [],
@@ -70,7 +69,7 @@ describe('revise requests', () => {
       'That exchange actually stays consistent with the card. No changes needed.\n\n\n' +
       '{\n "justification": "Looks fine.",\n "response": "New text"\n}\n';
     sendRequest.mockResolvedValue(openAiResponse(content));
-    await expect(request('native')).resolves.toEqual(fieldReply);
+    await expect(request()).resolves.toEqual(fieldReply);
   });
 
   test('native: uses Claude tool output', async () => {
@@ -78,56 +77,48 @@ describe('revise requests', () => {
       content: [{ type: 'tool_use', name: 'FieldRevision', input: fieldReply }],
       stop_reason: 'tool_use',
     });
-    await expect(request('native')).resolves.toEqual(fieldReply);
+    await expect(request()).resolves.toEqual(fieldReply);
   });
 
   test('explains thinking that used up all tokens', async () => {
     sendRequest.mockResolvedValue(openAiResponse('', 'length', 'Let me think about this...'));
-    await expect(request('native')).rejects.toThrow(
+    await expect(request()).rejects.toThrow(
       'The model used all 1024 response tokens on thinking and returned no answer. ' +
         'Raise "Max Response Tokens" or turn thinking off.',
     );
     sendRequest.mockResolvedValue(openAiResponse('<think>Hmm, let me see', 'length'));
-    await expect(request('json')).rejects.toThrow('used all 1024 response tokens on thinking');
+    await expect(request()).rejects.toThrow('used all 1024 response tokens on thinking');
   });
 
   test('explains empty responses', async () => {
     sendRequest.mockResolvedValue(openAiResponse('', 'length'));
-    await expect(request('json')).rejects.toThrow(
+    await expect(request()).rejects.toThrow(
       'The model returned no answer before hitting the 1024-token limit. Raise "Max Response Tokens".',
     );
     sendRequest.mockResolvedValue(openAiResponse('  ', 'stop'));
-    await expect(request('native')).rejects.toThrow('The model returned an empty response.');
+    await expect(request()).rejects.toThrow('The model returned an empty response.');
   });
 
-  test('explains cut-off JSON and XML', async () => {
+  test('explains cut-off JSON without retrying', async () => {
     sendRequest.mockResolvedValue(openAiResponse('{"justification": "Looks', 'length'));
-    await expect(request('native')).rejects.toThrow(
+    await expect(request()).rejects.toThrow(
       `The response was cut off at the 1024-token limit, so it isn't complete JSON. Raise "Max Response Tokens".`,
     );
-    sendRequest.mockResolvedValue(openAiResponse('```xml\n<root>\n<justification>Looks', 'length'));
-    await expect(request('xml')).rejects.toThrow(`cut off at the 1024-token limit, so it isn't complete XML`);
-  });
-
-  test('XML: ignores an unclosed code block start and text around the root', async () => {
-    const xml = '<root><justification>Looks fine.</justification><response>New text</response></root>';
-    sendRequest.mockResolvedValue(openAiResponse(`Sure.\n\`\`\`xml\n${xml}`));
-    await expect(request('xml')).resolves.toEqual(fieldReply);
+    expect(sendRequest).toHaveBeenCalledTimes(1);
   });
 
   test('shows the parse error and the start of invalid JSON', async () => {
     sendRequest.mockResolvedValue(openAiResponse('{"justification": "She said "no"", "response": "x"}'));
-    const error = await request('native').catch((e) => e);
+    const error = await request(undefined, 'invalid-json').catch((e) => e);
     expect(error.message).toMatch(/^Model response is not valid JSON \(.+\)\. It starts with: "\{"justification"/);
   });
 
   test('lists schema issues', async () => {
     sendRequest.mockResolvedValue(openAiResponse('{"justification": 5}'));
-    const error = await request('json').catch((e) => e);
+    const error = await request(undefined, 'schema-issues').catch((e) => e);
     expect(error.message).toContain('Model response failed schema validation for FieldRevision (justification: ');
     expect(error.message).toContain('; response: ');
     expect(error.message).toContain('It starts with: "{"justification": 5}"');
-    expect(stEcho).not.toHaveBeenCalled();
   });
 
   test('turns a cancelled request into an AbortError', async () => {
@@ -140,7 +131,7 @@ describe('revise requests', () => {
         }),
     );
     const controller = new AbortController();
-    const pending = request('native', controller.signal);
+    const pending = request(controller.signal);
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
   });
@@ -208,29 +199,40 @@ describe('request compatibility', () => {
     );
   });
 
-  test('native mode falls back to JSON mode when the request is rejected, and remembers it', async () => {
+  test('asks for JSON in the prompt when the native request is rejected, and remembers it', async () => {
     sendRequest
       .mockRejectedValueOnce(new Error('API request failed', { cause: new Error('Response not OK') }))
       .mockResolvedValue(openAiResponse(JSON.stringify(fieldReply)));
-    const request = () =>
-      makeStructuredRequest('no-native', [], FieldSpecificResponseSchema, 'FieldRevision', 'native', 1024);
+    const request = () => makeStructuredRequest('no-native', [], FieldSpecificResponseSchema, 'FieldRevision', 1024);
 
     await expect(request()).resolves.toEqual(fieldReply);
     expect(sendRequest).toHaveBeenCalledTimes(2);
     expect(sendRequest.mock.calls[0][4]).toHaveProperty('json_schema');
     expect(sendRequest.mock.calls[1][4]).not.toHaveProperty('json_schema');
-    expect(stEcho).toHaveBeenCalledWith('warning', expect.stringContaining('JSON mode is used for this profile'));
+    expect(stEcho).toHaveBeenCalledWith('info', expect.stringContaining('JSON is asked for in the prompt'));
+    expect(sendRequest.mock.calls[1][1].at(-1)).toMatchObject({ role: 'system' });
 
     await expect(request()).resolves.toEqual(fieldReply);
     expect(sendRequest).toHaveBeenCalledTimes(3);
     expect(sendRequest.mock.calls[2][4]).not.toHaveProperty('json_schema');
   });
 
-  test("native mode doesn't fall back when the response can't be used", async () => {
-    sendRequest.mockResolvedValue(openAiResponse('{"justification": 5}'));
+  test("asks for JSON in the prompt when a native reply doesn't match the schema", async () => {
+    sendRequest
+      .mockResolvedValueOnce(openAiResponse('Sure, I made it shorter.'))
+      .mockResolvedValueOnce(openAiResponse(JSON.stringify(fieldReply)));
     await expect(
-      makeStructuredRequest('native-ok', [], FieldSpecificResponseSchema, 'FieldRevision', 'native', 1024),
-    ).rejects.toThrow('schema validation');
+      makeStructuredRequest('native-ignored', [], FieldSpecificResponseSchema, 'FieldRevision', 1024),
+    ).resolves.toEqual(fieldReply);
+    expect(sendRequest).toHaveBeenCalledTimes(2);
+    expect(sendRequest.mock.calls[1][4]).not.toHaveProperty('json_schema');
+  });
+
+  test("doesn't retry an empty native reply", async () => {
+    sendRequest.mockResolvedValue(openAiResponse('', 'stop'));
+    await expect(
+      makeStructuredRequest('native-empty', [], FieldSpecificResponseSchema, 'FieldRevision', 1024),
+    ).rejects.toThrow('empty response');
     expect(sendRequest).toHaveBeenCalledTimes(1);
   });
 

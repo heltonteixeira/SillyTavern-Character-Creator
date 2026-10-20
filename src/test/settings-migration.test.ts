@@ -1,14 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import {
-  DEFAULT_CHAR_CARD_DESCRIPTION,
-  DEFAULT_JSON_FORMAT_DESC,
-  DEFAULT_NONE_FORMAT_DESC,
-  DEFAULT_REVISE_XML_PROMPT,
-  DEFAULT_XML_FORMAT_DESC,
-} from '../constants.js';
+import { DEFAULT_CHAR_CARD_DESCRIPTION, DEFAULT_NONE_FORMAT_DESC } from '../constants.js';
 import {
   compareFormatVersions,
   migrateSettings,
+  removeResponseFormatSettings,
   SettingsMigration,
   updateDefaultPrompts,
 } from '../settings-migration.js';
@@ -55,12 +50,10 @@ describe('settings migration', () => {
 });
 
 describe('updating default prompts (F_1.10 -> F_1.11)', () => {
+  // The XML/JSON format templates were updated here too; F_1.12 removes them.
   const newDefaults = {
     stDescription: DEFAULT_CHAR_CARD_DESCRIPTION,
-    xmlFormat: DEFAULT_XML_FORMAT_DESC,
-    jsonFormat: DEFAULT_JSON_FORMAT_DESC,
     noneFormat: DEFAULT_NONE_FORMAT_DESC,
-    reviseXmlPrompt: DEFAULT_REVISE_XML_PROMPT,
   };
   const f1_11: SettingsMigration = {
     from: 'F_1.10',
@@ -94,8 +87,8 @@ describe('updating default prompts (F_1.10 -> F_1.11)', () => {
       content: DEFAULT_CHAR_CARD_DESCRIPTION,
       isDefault: true,
     });
-    expect(result.prompts.xmlFormat.content).toBe(DEFAULT_XML_FORMAT_DESC);
     expect(result.prompts.noneFormat.content).toBe(DEFAULT_NONE_FORMAT_DESC);
+    expect(result.prompts.xmlFormat).toEqual(settings.prompts.xmlFormat);
     expect(result.prompts.jsonFormat).toEqual(settings.prompts.jsonFormat);
     expect(result.prompts.reviseXmlPrompt).toEqual(settings.prompts.reviseXmlPrompt);
     expect(result.prompts.taskDescription).toEqual(settings.prompts.taskDescription);
@@ -112,7 +105,7 @@ describe('updating default prompts (F_1.10 -> F_1.11)', () => {
     const result = await migrateSettings(makeSettings('F_1.10'), [f1_10, f1_11]);
 
     expect(result?.formatVersion).toBe('F_1.11');
-    expect(result?.prompts.xmlFormat.content).toBe(DEFAULT_XML_FORMAT_DESC);
+    expect(result?.prompts.noneFormat.content).toBe(DEFAULT_NONE_FORMAT_DESC);
     expect(result?.prompts.jsonFormat.content).toBe('my custom JSON format');
     expect((result as any).steps).toBeUndefined();
   });
@@ -128,5 +121,49 @@ describe('updating default prompts (F_1.10 -> F_1.11)', () => {
 
   test('does nothing at F_1.11', async () => {
     expect(await migrateSettings(makeSettings('F_1.11'), [f1_10, f1_11])).toBeUndefined();
+  });
+});
+
+describe('removing the response format settings (F_1.11 -> F_1.12)', () => {
+  const settings = {
+    formatVersion: 'F_1.11',
+    profileId: 'p1',
+    maxContextType: 'sampler',
+    maxContextValue: 16384,
+    outputFormat: 'json',
+    defaultPromptEngineeringMode: 'native',
+    prompts: {
+      xmlFormat: { label: 'XML', content: 'xml', isDefault: true },
+      jsonFormat: { label: 'JSON', content: 'my JSON format', isDefault: false },
+      noneFormat: { label: 'Plain', content: 'my plain format', isDefault: false },
+      reviseJsonPrompt: { label: 'Revise JSON', content: 'my revise JSON', isDefault: false },
+      reviseXmlPrompt: { label: 'Revise XML', content: 'my revise XML', isDefault: false },
+      myPrompt: { label: 'Mine', content: 'mine', isDefault: false },
+    },
+  };
+
+  test('removes the format settings and XML/JSON format templates, and keeps everything else', () => {
+    expect(removeResponseFormatSettings(settings)).toEqual({
+      formatVersion: 'F_1.11',
+      profileId: 'p1',
+      maxContextType: 'profile',
+      maxContextValue: 16384,
+      prompts: {
+        noneFormat: settings.prompts.noneFormat,
+        reviseJsonPrompt: settings.prompts.reviseJsonPrompt,
+        myPrompt: settings.prompts.myPrompt,
+      },
+    });
+  });
+
+  test('keeps a custom context size', () => {
+    expect(removeResponseFormatSettings({ ...settings, maxContextType: 'custom' }).maxContextType).toBe('custom');
+    expect(removeResponseFormatSettings({ ...settings, maxContextType: 'profile' }).maxContextType).toBe('profile');
+  });
+
+  test('does not modify the input', () => {
+    const copy = structuredClone(settings);
+    removeResponseFormatSettings(settings);
+    expect(settings).toEqual(copy);
   });
 });

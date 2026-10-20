@@ -60,3 +60,18 @@ export function updateDefaultPrompts<T extends { prompts: Record<string, any> }>
   }
   return { ...settings, prompts };
 }
+
+/**
+ * F_1.11 -> F_1.12: the response format is chosen by the task (plain text for fields, JSON for revise sessions), so the
+ * format settings and the XML/JSON format templates go. "Use active preset" for the context size depended on ST's
+ * current settings; the profile's preset replaces it. Returns an updated copy.
+ */
+export function removeResponseFormatSettings<T extends Record<string, any>>(settings: T): T {
+  const { outputFormat, defaultPromptEngineeringMode, ...rest } = settings;
+  const { xmlFormat, jsonFormat, reviseXmlPrompt, ...prompts } = settings.prompts ?? {};
+  return {
+    ...rest,
+    maxContextType: settings.maxContextType === 'custom' ? 'custom' : 'profile',
+    prompts,
+  } as unknown as T;
+}

@@ -98,10 +98,10 @@ export function emptyResponseMessage(info: ResponseInfo): string {
 /**
  * Explains a response that couldn't be parsed because it was cut off at the token limit.
  */
-export function truncatedResponseMessage(info: ResponseInfo, format: 'json' | 'xml'): string {
+export function truncatedResponseMessage(info: ResponseInfo): string {
   return (
-    `The response was ${cutOff(info)} at the ${info.maxTokens}-token limit, so it isn't complete ` +
-    `${format.toUpperCase()}. Raise "${MAX_TOKENS_LABEL}".`
+    `The response was ${cutOff(info)} at the ${info.maxTokens}-token limit, so it isn't complete JSON. ` +
+    `Raise "${MAX_TOKENS_LABEL}".`
   );
 }
 

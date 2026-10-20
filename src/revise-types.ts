@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { Session } from './generate.js';
-import { PromptEngineeringMode } from './settings.js';
 import { Message } from 'sillytavern-utils-lib';
 
 export const REVISE_SCHEMA_NAME = {
@@ -120,6 +119,5 @@ export interface ReviseSession {
     // Future context settings could be stored here
   };
   profileId: string;
-  promptEngineeringMode: PromptEngineeringMode;
   isReadonly?: boolean;
 }

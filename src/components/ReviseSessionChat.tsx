@@ -14,13 +14,14 @@ import {
 import { makePlainRequest, makeStructuredRequest } from '../request.js';
 import { getErrorMessage } from '../llm-response.js';
 import { calculateNewState } from '../revise-state.js';
-import { settingsManager, PromptEngineeringMode } from '../settings.js';
-import { selected_group, st_echo, this_chid } from 'sillytavern-utils-lib/config';
+import { settingsManager } from '../settings.js';
+import { st_echo } from 'sillytavern-utils-lib/config';
 import { CompareStatePopup } from './CompareStatePopup.js';
 import { POPUP_TYPE } from 'sillytavern-utils-lib/types/popup';
 import { CurrentStatePopup } from './CurrentStatePopup.js';
 import { CHARACTER_FIELDS } from '../generate.js';
-import { BuildPromptOptions, buildPrompt } from 'sillytavern-utils-lib';
+import { getContextSize, resolveConnection } from '../connection.js';
+import { insertChatHistory, MessageSelection } from '../chat-history.js';
 import { protectMacros, renderPrompt } from '../prompt-render.js';
 import { buildFieldList } from '../field-list.js';
 
@@ -141,7 +142,8 @@ interface ReviseSessionChatProps {
   onApply: (newState: CharacterState) => void;
   onSessionUpdate: (updatedSession: ReviseSession) => void;
   initialState: CharacterState;
-  chatContextOptions: BuildPromptOptions;
+  /** The chat messages to send, for the chat history block */
+  messageSelection: MessageSelection;
 }
 
 export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
@@ -150,7 +152,7 @@ export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
   onApply,
   onSessionUpdate,
   initialState,
-  chatContextOptions,
+  messageSelection,
 }) => {
   const [messages, setMessages] = useState<ReviseMessage[]>(session.messages);
   const [userInput, setUserInput] = useState('');
@@ -264,28 +266,19 @@ export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
       setIsLoading(true);
 
       try {
-        const finalMessagesForRequest: ReviseMessage[] = [];
-        const profile = globalContext.extensionSettings.connectionManager?.profiles?.find(
-          (p: any) => p.id === session.profileId,
-        );
-        const selectedApi = profile?.api ? globalContext.CONNECT_API_MAP[profile.api].selected : undefined;
-        if (!selectedApi) {
-          st_echo('warning', 'No API selected for this session.');
-          return;
-        }
-
-        for (const message of messagesToSend) {
-          if (message.id === CHAT_HISTORY_PLACEHOLDER_ID) {
-            if (this_chid === undefined && !selected_group) continue;
-            const prompt = await buildPrompt(selectedApi, chatContextOptions);
-            if (prompt.warnings?.length) {
-              prompt.warnings.forEach((w) => st_echo('warning', w));
-            }
-            finalMessagesForRequest.push(...(prompt.result as ReviseMessage[]));
-          } else {
-            finalMessagesForRequest.push(message);
-          }
-        }
+        const connection = resolveConnection(session.profileId);
+        const finalMessagesForRequest: ReviseMessage[] = [...messagesToSend];
+        // Replaces the chat history placeholder with chat messages, once all other messages are in place.
+        const withChatHistory = (requestMessages: ReviseMessage[]) =>
+          insertChatHistory(
+            requestMessages,
+            requestMessages.findIndex((message) => message.id === CHAT_HISTORY_PLACEHOLDER_ID),
+            {
+              selection: messageSelection,
+              contextSize: getContextSize(connection, settings),
+              maxResponseTokens: settings.maxResponseToken,
+            },
+          );
 
         const lastState =
           messagesToSend
@@ -338,7 +331,7 @@ export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
           });
           const responseContent = await makePlainRequest(
             session.profileId,
-            finalMessagesForRequest,
+            await withChatHistory(finalMessagesForRequest),
             settings.maxResponseToken,
             abortControllerRef.current.signal,
           );
@@ -364,10 +357,9 @@ export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
 
           const response = await makeStructuredRequest(
             session.profileId,
-            finalMessagesForRequest,
+            await withChatHistory(finalMessagesForRequest),
             schema,
             session.type === 'field' ? REVISE_SCHEMA_NAME.FIELD : REVISE_SCHEMA_NAME.GLOBAL,
-            session.promptEngineeringMode,
             settings.maxResponseToken,
             abortControllerRef.current.signal,
           );
@@ -402,7 +394,7 @@ export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
         abortControllerRef.current = null;
       }
     },
-    [session, onSessionUpdate, initialState, chatContextOptions, createAndAddStateUpdateMessage],
+    [session, onSessionUpdate, initialState, messageSelection, createAndAddStateUpdateMessage],
   );
 
   const handleSendMessage = useCallback(async () => {
@@ -599,20 +591,6 @@ export const ReviseSessionChat: FC<ReviseSessionChatProps> = ({
               onChange={(p) => onSessionUpdate({ ...session, profileId: p?.id ?? '' })}
             />
           </div>
-          <select
-            className="text_pole"
-            value={session.promptEngineeringMode}
-            onChange={(e) =>
-              onSessionUpdate({ ...session, promptEngineeringMode: e.target.value as PromptEngineeringMode })
-            }
-            title="Prompt Engineering Mode"
-            disabled={session.isReadonly}
-            style={{ minWidth: 'fit-content', width: 'unset' }}
-          >
-            <option value="native">Native</option>
-            <option value="json">JSON</option>
-            <option value="xml">XML</option>
-          </select>
           <STButton onClick={handleOpenCurrentState} title="View current character state">
             View State
           </STButton>

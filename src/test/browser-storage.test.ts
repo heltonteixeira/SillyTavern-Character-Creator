@@ -64,7 +64,6 @@ const createReviseSession = (): ReviseSession => ({
   messages: [{ id: 'm-1', role: 'assistant', content: 'Done' }],
   context: { mainContextTemplatePreset: 'default' },
   profileId: 'profile-1',
-  promptEngineeringMode: 'native',
 });
 
 describe('browser storage', () => {

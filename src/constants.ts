@@ -133,21 +133,6 @@ export const DEFAULT_CHAR_CARD_DEFINITION_TEMPLATE = `{{#if characters}}
 {{/each}}
 {{/if}}`;
 
-export const DEFAULT_XML_FORMAT_DESC = `=== RESPONSE FORMAT INSTRUCTIONS ===
-You MUST provide your response wrapped ONLY in a single <response> XML tag, with the content inside a CDATA section.
-Quotes, &, <START> and line breaks are safe inside CDATA. Never write ]]> inside it.
-
-Example:
-<response><![CDATA[Generated content for the field goes here.]]></response>`;
-
-export const DEFAULT_JSON_FORMAT_DESC = `=== RESPONSE FORMAT INSTRUCTIONS ===
-You MUST provide your response as a JSON object with a single key "response" containing the generated content as a string.
-
-Example:
-{
-  "response": "Generated content for the field goes here."
-}`;
-
 export const DEFAULT_NONE_FORMAT_DESC = `=== RESPONSE FORMAT INSTRUCTIONS ===
 You MUST provide ONLY the raw text content for the field, without any formatting, XML tags, JSON structure, or explanatory text. Just the content itself.
 
@@ -238,27 +223,6 @@ export const DEFAULT_REVISE_JSON_PROMPT = `You are a highly specialized AI assis
 **EXAMPLE OF A PERFECT RESPONSE:**
 \`\`\`json
 {{example_response}}
-\`\`\``;
-
-export const DEFAULT_REVISE_XML_PROMPT = `You are a highly specialized AI assistant. Your SOLE purpose is to generate a single, valid XML structure that strictly adheres to the provided example.
-
-**CRITICAL INSTRUCTIONS:**
-1.  You MUST wrap the entire XML object in a markdown code block (\`\`\`xml\\n...\\n\`\`\`).
-2.  Your response MUST NOT contain any explanatory text, comments, or any other content outside of this single code block.
-3.  The XML object inside the code block MUST be valid and MUST be a single <root> element, following the structure described by the JSON schema below.
-4.  Wrap every text value in a CDATA section, e.g. <name><![CDATA[Text with "quotes", & and <START>]]></name>. Never write ]]> inside a CDATA section.
-5.  For lists, write each entry as an <item> element inside the list's element, as shown in the example.
-
-**JSON SCHEMA OF THE XML STRUCTURE:**
-\`\`\`json
-{{schema}}
-\`\`\`
-
-**EXAMPLE OF A PERFECT RESPONSE:**
-\`\`\`xml
-<root>
-{{example_response}}
-</root>
 \`\`\``;
 
 export const DEFAULT_REVISE_TASK_DESCRIPTION = `You are an expert character writer assisting a user. Your task is to respond with the modified character data in the required structured format.

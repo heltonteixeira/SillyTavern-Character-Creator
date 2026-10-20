@@ -2,11 +2,11 @@ import { Message } from 'sillytavern-utils-lib';
 import { ExtractedData } from 'sillytavern-utils-lib/types';
 import { z } from 'zod';
 import { st_echo } from 'sillytavern-utils-lib/config';
-import { PromptEngineeringMode, settingsManager } from './settings.js';
+import { settingsManager } from './settings.js';
 import * as Handlebars from 'handlebars';
 import './handlebars-helpers.js';
 import { schemaToExample } from './schema-to-example.js';
-import { parseResponse, responseSnippet } from './parsers.js';
+import { extractJson, responseSnippet } from './parsers.js';
 import {
   emptyResponseMessage,
   isEmptyResponse,
@@ -15,10 +15,12 @@ import {
   truncatedResponseMessage,
   truncatedTextWarning,
 } from './llm-response.js';
-import { buildPresetPayload, RequestError, toRequestMessages } from './request-payload.js';
+import { buildPresetPayload, RequestError, stripProfileReasoning, toRequestMessages } from './request-payload.js';
+import { resolveConnection } from './connection.js';
 
 /**
- * Sends a non-streaming request and reads the raw provider response, so the finish reason and reasoning are known.
+ * Sends a non-streaming request through a connection profile and reads the raw provider response, so the finish
+ * reason and reasoning are known. See connection.ts for what is taken from the profile.
  * For Chat Completion, ST's JSON extraction is skipped: it returns `{}` for text that isn't pure JSON.
  * @throws AbortError if the signal was aborted
  */
@@ -31,9 +33,8 @@ export async function sendRawRequest(
 ): Promise<ResponseInfo> {
   const context = SillyTavern.getContext();
   const service = context.ConnectionManagerRequestService as any;
-  const profile = service.getProfile(profileId);
-  const apiMap = service.validateProfile(profile);
-  const mainApi: string = apiMap.selected;
+  const connection = resolveConnection(profileId, context);
+  const { profile, mainApi } = connection;
   // Text Completion keeps ST's extraction, which trims stop strings and instruct sequences.
   const extractData = mainApi !== 'openai';
   const requestMessages = toRequestMessages(messages, mainApi);
@@ -42,12 +43,10 @@ export async function sendRawRequest(
   let payload = overridePayload;
   let data: any;
   try {
-    if (mainApi === 'openai') {
-      const presetPayload = await buildPresetPayload(context, profile, apiMap.source, requestMessages, maxTokens);
-      if (presetPayload) {
-        custom.includePreset = false;
-        payload = { ...presetPayload, ...overridePayload };
-      }
+    const presetPayload = await buildPresetPayload(context, connection, requestMessages, maxTokens);
+    if (presetPayload) {
+      custom.includePreset = false;
+      payload = { ...presetPayload, ...overridePayload };
     }
     // Building the preset payload is async, so the request may have been cancelled meanwhile.
     signal?.throwIfAborted();
@@ -65,12 +64,17 @@ export async function sendRawRequest(
   let info: ResponseInfo;
   if (extractData) {
     const content = (data as ExtractedData)?.content;
-    info = readResponseInfo({}, typeof content === 'string' ? content : '', maxTokens);
+    const message = typeof content === 'string' ? content : '';
+    const text = stripProfileReasoning(context, profile, message);
+    info = readResponseInfo({}, text, maxTokens);
     // With a JSON schema, ST returns the parsed object
     const structured = content !== null && typeof content === 'object' ? content : undefined;
-    info = { ...info, structured, hasReasoning: info.hasReasoning || !!data?.reasoning };
+    info = { ...info, structured, hasReasoning: info.hasReasoning || !!data?.reasoning || text !== message };
   } else {
-    info = readResponseInfo(data, context.extractMessageFromData(data, mainApi), maxTokens, !!payload.json_schema);
+    const message = context.extractMessageFromData(data, mainApi);
+    const text = stripProfileReasoning(context, profile, message);
+    info = readResponseInfo(data, text, maxTokens, !!payload.json_schema);
+    info = { ...info, hasReasoning: info.hasReasoning || text !== message };
   }
   return estimateTruncation(info, context);
 }
@@ -115,129 +119,122 @@ export async function makePlainRequest(
   return response.text;
 }
 
+/** A response that has text but doesn't contain JSON matching the schema. */
+class UnusableResponseError extends Error {}
+
 /**
- * Parses a structured response, explaining empty and cut-off responses.
+ * Parses and validates a structured response, explaining empty and cut-off responses.
+ * @throws UnusableResponseError if the response has no JSON matching the schema
  */
-function parseStructuredResponse(response: ResponseInfo, format: 'json' | 'xml', jsonSchema: any): unknown {
-  if (response.structured !== undefined) {
-    return response.structured;
-  }
-  if (isEmptyResponse(response)) {
-    throw new Error(emptyResponseMessage(response));
-  }
-  try {
-    return parseResponse(response.text, format, { schema: jsonSchema });
-  } catch (error) {
-    if (response.truncated) {
-      throw new Error(truncatedResponseMessage(response, format));
-    }
-    throw error;
-  }
-}
-
-/** Profiles (with their model) whose native mode request was rejected. Kept until the page is reloaded. */
-const nativeModeRejected = new Set<string>();
-
-function nativeModeKey(profileId: string): string {
-  const profile = (SillyTavern.getContext().ConnectionManagerRequestService as any).getProfile(profileId);
-  return `${profileId}:${profile?.model ?? ''}`;
-}
-
-export async function makeStructuredRequest<T extends z.ZodType<any, any, any>>(
-  profileId: string,
-  baseMessages: Message[],
+function parseStructuredResponse<T extends z.ZodType<any, any, any>>(
+  response: ResponseInfo,
   schema: T,
   schemaName: string,
-  promptEngineeringMode: PromptEngineeringMode,
-  maxResponseToken: number,
-  signal?: AbortSignal,
-): Promise<z.infer<T>> {
-  const settings = settingsManager.getSettings();
-  let response!: ResponseInfo;
-  let parsedContent: unknown;
-
-  const jsonSchema = z.toJSONSchema(schema);
-
-  let format = promptEngineeringMode === 'native' ? undefined : promptEngineeringMode;
-  if (!format) {
-    const key = nativeModeKey(profileId);
-    if (nativeModeRejected.has(key)) {
-      format = 'json';
-    } else {
-      try {
-        response = await sendRawRequest(
-          profileId,
-          baseMessages,
-          maxResponseToken,
-          {
-            json_schema: { name: schemaName, strict: true, value: jsonSchema },
-          },
-          signal,
-        );
-        parsedContent = parseStructuredResponse(response, 'json', jsonSchema);
-      } catch (error) {
-        // ST turns the schema into provider-specific options, which some providers or models reject (e.g. Claude
-        // models that don't support a forced tool call). JSON mode asks for the same schema in the prompt.
-        if (!(error instanceof RequestError)) {
-          throw error;
-        }
-        nativeModeRejected.add(key);
-        st_echo(
-          'warning',
-          `Native mode failed, so JSON mode is used for this profile until the page is reloaded. ${error.message}`,
-        );
-        format = 'json';
-      }
+): z.infer<T> {
+  let parsed: unknown = response.structured;
+  if (parsed === undefined) {
+    if (isEmptyResponse(response)) {
+      throw new Error(emptyResponseMessage(response));
     }
-  }
-
-  if (format) {
-    // Manual prompt engineering for JSON or XML
-    const example = schemaToExample(jsonSchema, format);
-    const schemaString = JSON.stringify(jsonSchema, null, 2);
-    const promptTemplateKey = format === 'json' ? 'reviseJsonPrompt' : 'reviseXmlPrompt';
-    const promptTemplate = settings.prompts[promptTemplateKey]?.content;
-
-    if (!promptTemplate) {
-      throw new Error(`Prompt template for mode "${format}" not found.`);
-    }
-
-    const templateContext = {
-      example_response: example,
-      schema: schemaString,
-    };
-
-    let resolvedPrompt: string;
     try {
-      resolvedPrompt = Handlebars.compile(promptTemplate, { noEscape: true, strict: true })(templateContext);
+      parsed = extractJson(response.text);
     } catch (error: any) {
-      const label = settings.prompts[promptTemplateKey]?.label ?? promptTemplateKey;
-      throw new Error(
-        `Failed to render the "${label}" prompt template: ${error?.message ?? error}. ` +
-          `Available variables: ${Object.keys(templateContext).join(', ')}.`,
+      if (response.truncated) {
+        throw new Error(truncatedResponseMessage(response));
+      }
+      console.error('Raw response:', response.text);
+      throw new UnusableResponseError(
+        `Model response is not valid JSON (${error?.message ?? error}). ${responseSnippet(response.text)}`,
       );
     }
-    const instructionMessage: Message = { role: 'system', content: resolvedPrompt };
-
-    response = await sendRawRequest(profileId, [...baseMessages, instructionMessage], maxResponseToken, {}, signal);
-    parsedContent = parseStructuredResponse(response, format, jsonSchema);
   }
 
-  const validationResult = schema.safeParse(parsedContent);
+  const validationResult = schema.safeParse(parsed);
   if (!validationResult.success) {
     const issues = validationResult.error.issues;
     console.error('Zod validation failed:', issues);
-    console.error('Raw response:', response.text, 'Parsed:', parsedContent);
+    console.error('Raw response:', response.text, 'Parsed:', parsed);
     const issueList = issues
       .slice(0, 3)
       .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
       .join('; ');
     const raw = response.structured !== undefined ? JSON.stringify(response.structured) : response.text;
-    throw new Error(
+    throw new UnusableResponseError(
       `Model response failed schema validation for ${schemaName} (${issueList}${issues.length > 3 ? '; …' : ''}). ` +
         responseSnippet(raw),
     );
   }
-
   return validationResult.data;
+}
+
+/** Profiles (with their model) whose native structured output failed. Kept until the page is reloaded. */
+const nativeModeFailed = new Set<string>();
+
+function nativeModeKey(profileId: string): string {
+  return `${profileId}:${resolveConnection(profileId).profile.model ?? ''}`;
+}
+
+/**
+ * Requests JSON matching `schema`. The schema is first sent as native structured output, which ST turns into
+ * provider-specific options. If the provider rejects it or the reply doesn't match the schema (e.g. an endpoint that
+ * ignores the schema), the schema is asked for in the prompt instead ("Revise Session (JSON Mode)" template), and from
+ * then on for this profile and model until the page is reloaded.
+ */
+export async function makeStructuredRequest<T extends z.ZodType<any, any, any>>(
+  profileId: string,
+  baseMessages: Message[],
+  schema: T,
+  schemaName: string,
+  maxResponseToken: number,
+  signal?: AbortSignal,
+): Promise<z.infer<T>> {
+  const jsonSchema = z.toJSONSchema(schema);
+
+  const key = nativeModeKey(profileId);
+  if (!nativeModeFailed.has(key)) {
+    try {
+      const response = await sendRawRequest(
+        profileId,
+        baseMessages,
+        maxResponseToken,
+        { json_schema: { name: schemaName, strict: true, value: jsonSchema } },
+        signal,
+      );
+      return parseStructuredResponse(response, schema, schemaName);
+    } catch (error: any) {
+      if (!(error instanceof RequestError || error instanceof UnusableResponseError)) {
+        throw error;
+      }
+      nativeModeFailed.add(key);
+      console.warn('Native structured output failed, asking for JSON in the prompt instead:', error);
+      st_echo(
+        'info',
+        `Native structured output didn't work for this profile, so JSON is asked for in the prompt until the page is reloaded. ${error.message}`,
+      );
+    }
+  }
+
+  const settings = settingsManager.getSettings();
+  const promptTemplate = settings.prompts.reviseJsonPrompt?.content;
+  if (!promptTemplate) {
+    throw new Error('The "Revise Session (JSON Mode)" prompt template is missing.');
+  }
+  const templateContext = {
+    example_response: schemaToExample(jsonSchema),
+    schema: JSON.stringify(jsonSchema, null, 2),
+  };
+  let resolvedPrompt: string;
+  try {
+    resolvedPrompt = Handlebars.compile(promptTemplate, { noEscape: true, strict: true })(templateContext);
+  } catch (error: any) {
+    const label = settings.prompts.reviseJsonPrompt?.label ?? 'reviseJsonPrompt';
+    throw new Error(
+      `Failed to render the "${label}" prompt template: ${error?.message ?? error}. ` +
+        `Available variables: ${Object.keys(templateContext).join(', ')}.`,
+    );
+  }
+  const instructionMessage: Message = { role: 'system', content: resolvedPrompt };
+
+  const response = await sendRawRequest(profileId, [...baseMessages, instructionMessage], maxResponseToken, {}, signal);
+  return parseStructuredResponse(response, schema, schemaName);
 }

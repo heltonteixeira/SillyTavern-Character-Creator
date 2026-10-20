@@ -9,7 +9,7 @@ import {
   DropdownItem,
   PresetItem,
 } from 'sillytavern-utils-lib/components/react';
-import { applyWorldInfoEntry, createCharacter, saveCharacter, BuildPromptOptions } from 'sillytavern-utils-lib';
+import { applyWorldInfoEntry, createCharacter, saveCharacter } from 'sillytavern-utils-lib';
 import { selected_group, st_echo, this_chid, world_names } from 'sillytavern-utils-lib/config';
 import { POPUP_TYPE } from 'sillytavern-utils-lib/types/popup';
 import { Character, FullExportData } from 'sillytavern-utils-lib/types';
@@ -222,58 +222,8 @@ export const MainPopup: FC = () => {
       if (!settings.profileId) return st_echo('warning', 'Please select a connection profile.');
       setIsGenerating((prev) => [...prev, targetField]);
       try {
-        const profile = globalContext.extensionSettings.connectionManager?.profiles?.find(
-          (p) => p.id === settings.profileId,
-        );
-        if (!profile) throw new Error('Connection profile not found.');
-
-        // This logic is complex and directly adapted from your vanilla implementation
-        const buildPromptOptions: BuildPromptOptions = {
-          presetName: profile?.preset,
-          contextName: profile?.context,
-          instructName: profile?.instruct,
-          targetCharacterId: this_chid,
-          ignoreCharacterFields: true,
-          ignoreWorldInfo: true,
-          ignoreAuthorNote: true,
-          maxContext:
-            settings.maxContextType === 'custom'
-              ? settings.maxContextValue
-              : settings.maxContextType === 'profile'
-                ? 'preset'
-                : 'active',
-          includeNames: !!selected_group,
-        };
-
-        // Add message range options
         const msgContext = settings.contextToSend.messages;
-        switch (msgContext.type) {
-          case 'none':
-            buildPromptOptions.messageIndexesBetween = { start: -1, end: -1 };
-            break;
-          case 'first':
-            buildPromptOptions.messageIndexesBetween = { start: 0, end: msgContext.first ?? 10 };
-            break;
-          case 'last':
-            const chatLength = globalContext.chat?.length ?? 0;
-            const lastCount = msgContext.last ?? 10;
-            buildPromptOptions.messageIndexesBetween = {
-              end: Math.max(0, chatLength - 1),
-              start: Math.max(0, chatLength - lastCount),
-            };
-            break;
-          case 'range':
-            buildPromptOptions.messageIndexesBetween = {
-              start: msgContext.range?.start ?? 0,
-              end: msgContext.range?.end ?? 10,
-            };
-            break;
-          case 'all':
-          default:
-            break;
-        }
-        // Like the revise session, skip the chat history block when no messages are sent. Otherwise buildPrompt
-        // still adds the profile preset's prompts (main, jailbreak, etc.) without any chat messages.
+        // Like the revise session, skip the chat history block when no messages are sent.
         const includeChatHistory = msgContext.type !== 'none' && (this_chid !== undefined || !!selected_group);
         const entriesGroupByWorldName: Record<string, WIEntry[]> = {};
         if (settings.contextToSend.worldInfo) {
@@ -317,20 +267,19 @@ export const MainPopup: FC = () => {
         const generatedContent = await runCharacterFieldGeneration({
           profileId: settings.profileId,
           userPrompt: settings.promptPresets[settings.promptPreset].content,
-          buildPromptOptions,
+          messageSelection: msgContext,
           continueFrom,
           session,
           allCharacters,
           entriesGroupByWorldName,
           promptSettings,
-          formatDescription: { content: settings.prompts[`${settings.outputFormat}Format`].content },
+          formatDescription: { content: settings.prompts.noneFormat.content },
           mainContextList: settings.mainContextTemplatePresets[settings.mainContextTemplatePreset].prompts.filter(
             (p) => p.enabled && (includeChatHistory || p.promptName !== 'chatHistory'),
           ),
           includeUserMacro: settings.contextToSend.persona,
           maxResponseToken: settings.maxResponseToken,
           targetField: targetField,
-          outputFormat: settings.outputFormat,
         });
 
         const isGreeting = targetField.startsWith('alternate_greetings_');
@@ -752,7 +701,6 @@ export const MainPopup: FC = () => {
                 onChange={(e) => updateSetting('maxContextType', e.target.value as any)}
               >
                 <option value="profile">Use profile preset</option>
-                <option value="sampler">Use active preset</option>
                 <option value="custom">Custom</option>
               </select>
             </label>
@@ -772,18 +720,6 @@ export const MainPopup: FC = () => {
                 value={settings.maxResponseToken}
                 onChange={(e) => updateSetting('maxResponseToken', parseInt(e.target.value) || 1024)}
               />
-            </label>
-            <label>
-              Output Format
-              <select
-                className="text_pole"
-                value={settings.outputFormat}
-                onChange={(e) => updateSetting('outputFormat', e.target.value as any)}
-              >
-                <option value="none">Plain Text</option>
-                <option value="xml">XML</option>
-                <option value="json">JSON</option>
-              </select>
             </label>
           </div>
           <div className="card">

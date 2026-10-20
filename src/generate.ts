@@ -1,9 +1,9 @@
-import { buildPrompt, BuildPromptOptions, ExtensionSettingsManager, Message } from 'sillytavern-utils-lib';
-import { parseResponse, getPrefilled, mergeContinuation } from './parsers.js';
+import { ExtensionSettingsManager, Message } from 'sillytavern-utils-lib';
+import { parseFieldResponse, mergeContinuation } from './parsers.js';
 import { Character } from 'sillytavern-utils-lib/types';
 import { WIEntry } from 'sillytavern-utils-lib/types/world-info';
 import { name1, st_echo } from 'sillytavern-utils-lib/config';
-import { ExtensionSettings, MessageRole, OutputFormat, settingsManager } from './settings.js';
+import { ExtensionSettings, MessageRole, settingsManager } from './settings.js';
 
 import * as Handlebars from 'handlebars';
 import './handlebars-helpers.js';
@@ -11,6 +11,8 @@ import { protectMacros, renderPrompt } from './prompt-render.js';
 import { sendRawRequest } from './request.js';
 import { emptyResponseMessage, isEmptyResponse, truncatedTextWarning } from './llm-response.js';
 import { buildFieldList, CHARACTER_FIELDS, CharacterFieldName, getFieldLabel, selectSentFields } from './field-list.js';
+import { getContextSize, resolveConnection } from './connection.js';
+import { insertChatHistory, MessageSelection } from './chat-history.js';
 
 export const globalContext = SillyTavern.getContext();
 
@@ -43,7 +45,7 @@ export interface Session {
  * Sent before the prefill of a continue request, so the model knows to add text instead of closing or rewriting it.
  */
 export const CONTINUE_INSTRUCTION =
-  'Continue the current text of the {{targetField}} field from exactly where it stops. Output only the new text that comes after it, in the required output format. Do not repeat, rewrite or summarize the existing text.';
+  'Continue the current text of the {{targetField}} field from exactly where it stops. Output only the new text that comes after it. Do not repeat, rewrite or summarize the existing text.';
 
 // @ts-ignore
 const dumbSettings = new ExtensionSettingsManager<ExtensionSettings>('dumb', {}).getSettings();
@@ -51,7 +53,8 @@ const dumbSettings = new ExtensionSettingsManager<ExtensionSettings>('dumb', {})
 export interface RunCharacterFieldGenerationParams {
   profileId: string;
   userPrompt: string;
-  buildPromptOptions: BuildPromptOptions;
+  /** The chat messages to send, for the chat history block */
+  messageSelection: MessageSelection;
   continueFrom?: string;
   session: Session;
   allCharacters: Character[];
@@ -67,13 +70,12 @@ export interface RunCharacterFieldGenerationParams {
   includeUserMacro: boolean;
   maxResponseToken: number;
   targetField: CharacterFieldName | string;
-  outputFormat: OutputFormat;
 }
 
 export async function runCharacterFieldGeneration({
   profileId,
   userPrompt,
-  buildPromptOptions,
+  messageSelection,
   continueFrom,
   session,
   allCharacters,
@@ -84,20 +86,8 @@ export async function runCharacterFieldGeneration({
   includeUserMacro,
   maxResponseToken,
   targetField,
-  outputFormat,
 }: RunCharacterFieldGenerationParams): Promise<string> {
-  if (!profileId) {
-    throw new Error('No connection profile selected.');
-  }
-  const profile = globalContext.extensionSettings.connectionManager?.profiles?.find((p: any) => p.id === profileId);
-  if (!profile) {
-    throw new Error(`Connection profile with ID "${profileId}" not found.`);
-  }
-
-  const selectedApi = profile.api ? globalContext.CONNECT_API_MAP[profile.api].selected : undefined;
-  if (!selectedApi) {
-    throw new Error(`Could not determine API for profile "${profile.name}".`);
-  }
+  const connection = resolveConnection(profileId);
 
   const templateData: Record<string, any> = {};
 
@@ -185,18 +175,14 @@ export async function runCharacterFieldGeneration({
     templateData['fieldList'] = protectMacros(buildFieldList(sentFields, session.draftFields));
   }
 
-  const messages: Message[] = [];
+  let messages: Message[] = [];
+  let chatHistoryIndex = -1;
   {
     for (const mainContext of mainContextList) {
-      // Chat history is exception, since it is not a template
+      // Chat history is exception, since it is not a template. It is filled in once the other messages are known.
       if (mainContext.promptName === 'chatHistory') {
-        const prompt = await buildPrompt(selectedApi, buildPromptOptions);
-        if (prompt.warnings && prompt.warnings.length > 0) {
-          for (const warning of prompt.warnings) {
-            st_echo('warning', warning);
-          }
-        }
-        messages.push(...prompt.result);
+        chatHistoryIndex = messages.length;
+        messages.push({ role: 'system', content: '' });
         continue;
       }
 
@@ -227,10 +213,16 @@ export async function runCharacterFieldGeneration({
       });
       messages.push({
         role: 'assistant',
-        content: getPrefilled(continueFrom, outputFormat),
+        content: continueFrom.trim(),
       });
     }
   }
+
+  messages = await insertChatHistory(messages, chatHistoryIndex, {
+    selection: messageSelection,
+    contextSize: getContextSize(connection, settingsManager.getSettings()),
+    maxResponseTokens: maxResponseToken,
+  });
 
   const response = await sendRawRequest(profileId, messages, maxResponseToken);
   // An empty reply to a continue request only means nothing was added, unless it was cut off.
@@ -243,7 +235,7 @@ export async function runCharacterFieldGeneration({
 
   // For "continue" requests, the model should only return the new part, but some models ignore the prefill.
   if (continueFrom) {
-    const continued = mergeContinuation(continueFrom, response.text, outputFormat);
+    const continued = mergeContinuation(continueFrom, response.text);
     if (continued.trim() === continueFrom.trim()) {
       st_echo('warning', "The model didn't add any text. Try again or use a different model.");
       return continueFrom;
@@ -251,22 +243,5 @@ export async function runCharacterFieldGeneration({
     return continued;
   }
 
-  const result = parseResponse(response.text, outputFormat);
-
-  let finalContent: string;
-  if (typeof result === 'string') {
-    finalContent = result;
-  } else if (typeof result === 'object' && result !== null) {
-    // For single-field generation, extract the string from the object.
-    if ('response' in result && typeof result.response === 'string') {
-      finalContent = result.response;
-    } else {
-      const firstValue = Object.values(result)[0];
-      finalContent = firstValue ? String(firstValue) : '';
-    }
-  } else {
-    finalContent = '';
-  }
-
-  return finalContent;
+  return parseFieldResponse(response.text);
 }
