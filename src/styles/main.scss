@@ -669,3 +669,97 @@
         }
     }
 }
+
+.charCreator_settings {
+    .charCreator_settingsLabel {
+        display: block;
+        margin-top: 10px;
+    }
+
+    // Rows have a fixed height, so the drag handle stays on the row when the editor is open under it
+    .sortable-list-item .drag-handle {
+        align-self: flex-start;
+        line-height: 30px;
+    }
+
+    .charCreator_promptRow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+    }
+
+    .charCreator_promptRowOff {
+        opacity: 0.6;
+    }
+
+    .charCreator_promptName {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .charCreator_promptNameText {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .charCreator_promptRole {
+        flex-shrink: 0;
+    }
+
+    .charCreator_promptAction {
+        flex-shrink: 0;
+        width: 1.2em;
+        padding: 0;
+        border: none;
+        background-color: transparent;
+        color: var(--SmartThemeBodyColor);
+        text-align: center;
+        cursor: pointer;
+    }
+
+    .charCreator_promptAction.caution {
+        color: var(--fullred);
+    }
+
+    .charCreator_promptToggle {
+        width: 1.6em;
+        font-size: 1.2em;
+    }
+
+    .charCreator_promptToggle.fa-toggle-on {
+        color: var(--success-color, #4caf50);
+    }
+
+    .charCreator_promptBar,
+    .charCreator_promptEditorHeader {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        margin-top: 5px;
+
+        select,
+        input {
+            flex: 1;
+            min-width: 0;
+        }
+    }
+
+    .charCreator_promptBar .caution {
+        color: var(--fullred);
+    }
+
+    .charCreator_promptEditor {
+        margin-top: 5px;
+        white-space: normal;
+
+        .charCreator_promptEditorHeader .charCreator_settingsLabel {
+            flex: 1;
+            margin-top: 0;
+        }
+    }
+}
