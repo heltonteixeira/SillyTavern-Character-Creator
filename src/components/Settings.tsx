@@ -1,4 +1,4 @@
-import React, { FC, useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { FC, useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { st_echo } from 'sillytavern-utils-lib/config';
 import {
   PresetItem,
@@ -47,6 +47,15 @@ const ROLE_ICONS: Partial<Record<MessageRole, { icon: string; title: string }>> 
   assistant: { icon: 'fa-robot', title: 'Sent as Assistant' },
 };
 
+interface PromptDraft {
+  /** Undefined for a new prompt */
+  promptName?: string;
+  label: string;
+  content: string;
+  /** The role of the prompt's entry in the current template, if it has one */
+  role?: MessageRole;
+}
+
 const isSystemPrompt = (promptName: string) => SYSTEM_PROMPT_KEYS.includes(promptName as SystemPromptKey);
 
 export const CharacterCreatorSettings: FC = () => {
@@ -55,14 +64,14 @@ export const CharacterCreatorSettings: FC = () => {
   const settings = settingsManager.getSettings();
   // The prompt chosen in the dropdown under the template list
   const [libraryPromptName, setLibraryPromptName] = useState<string>(CHAT_HISTORY_PROMPT);
-  // The prompt open in the editor, if any
-  const [editingPromptName, setEditingPromptName] = useState<string | null>(null);
+  // The prompt open in the editor, if any. Changes stay here until Save, like in ST's prompt editor.
+  const [draft, setDraft] = useState<PromptDraft | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
 
   // Bring the editor into view when a prompt is opened
   useEffect(() => {
-    if (editingPromptName) editorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [editingPromptName]);
+    if (draft) editorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [draft?.promptName, !!draft]);
 
   const updateAndRefresh = useCallback(
     (updater: (currentSettings: ExtensionSettings) => void) => {
@@ -108,6 +117,13 @@ export const CharacterCreatorSettings: FC = () => {
     : CHAT_HISTORY_PROMPT;
 
   const currentTemplate = settings.mainContextTemplatePresets[settings.mainContextTemplatePreset];
+  const findBlock = (promptName?: string) =>
+    promptName ? currentTemplate?.prompts.find((p) => p.promptName === promptName) : undefined;
+
+  // The role belongs to the template's entry, so it follows the selected template
+  useEffect(() => {
+    setDraft((d) => (d?.promptName ? { ...d, role: findBlock(d.promptName)?.role ?? d.role } : d));
+  }, [settings.mainContextTemplatePreset]);
 
   // --- Handlers for Main Context Template ---
   const handleMainContextPresetChange = (newValue?: string) => {
@@ -148,13 +164,6 @@ export const CharacterCreatorSettings: FC = () => {
     }));
   };
 
-  const handleRoleChange = (promptName: string, role: MessageRole) => {
-    updateCurrentTemplate((preset) => ({
-      ...preset,
-      prompts: preset.prompts.map((p) => (p.promptName === promptName ? { ...p, role } : p)),
-    }));
-  };
-
   const handleRestoreMainContextDefault = async () => {
     const name = settings.mainContextTemplatePreset;
     const confirm = await globalContext.Popup.show.confirm(
@@ -184,84 +193,97 @@ export const CharacterCreatorSettings: FC = () => {
       s.prompts = restPrompts;
       s.mainContextTemplatePresets = removePromptFromAll(s.mainContextTemplatePresets, promptName);
     });
-    if (editingPromptName === promptName) setEditingPromptName(null);
-  };
-
-  const handleNewPrompt = async () => {
-    const input = await globalContext.Popup.show.input('New prompt', 'Enter a name for the new prompt:', '');
-    const name = input?.trim();
-    if (!name) return;
-    if (Object.values(settings.prompts).some((p) => p.label.toLowerCase() === name.toLowerCase())) {
-      st_echo('error', `A prompt named "${name}" already exists.`);
-      return;
-    }
-    const promptName = uniquePromptId(convertToVariableName(name), Object.keys(settings.prompts));
-    updateAndRefresh((s) => {
-      s.prompts = { ...s.prompts, [promptName]: { label: name, content: '', isDefault: false } };
-      const preset = s.mainContextTemplatePresets[s.mainContextTemplatePreset];
-      if (preset) {
-        s.mainContextTemplatePresets = {
-          ...s.mainContextTemplatePresets,
-          [s.mainContextTemplatePreset]: insertPrompt(preset, promptName),
-        };
-      }
-    });
-    setLibraryPromptName(promptName);
-    setEditingPromptName(promptName);
+    if (draft?.promptName === promptName) setDraft(null);
   };
 
   // --- Handlers for the prompt editor ---
-  const editingPrompt = editingPromptName ? settings.prompts[editingPromptName] : undefined;
-
-  const handlePromptLabelChange = (label: string) => {
-    if (!editingPromptName) return;
-    updateAndRefresh((s) => {
-      s.prompts = { ...s.prompts, [editingPromptName]: { ...s.prompts[editingPromptName], label } };
-    });
+  /** The editor's starting values for a prompt, or for a new prompt when `promptName` is undefined */
+  const makeDraft = (promptName?: string): PromptDraft => {
+    const prompt = promptName ? settings.prompts[promptName] : undefined;
+    return {
+      promptName,
+      label: prompt?.label ?? '',
+      content: prompt?.content ?? '',
+      // A new prompt goes into the current template
+      role: promptName ? findBlock(promptName)?.role : 'system',
+    };
   };
 
-  const handlePromptLabelBlur = () => {
-    // A prompt needs a name to be found in the lists
-    if (editingPromptName && !editingPrompt?.label.trim()) handlePromptLabelChange(editingPromptName);
+  const isDraftChanged = (d: PromptDraft) => {
+    if (!d.promptName) return d.label.trim() !== '' || d.content !== '';
+    const prompt = settings.prompts[d.promptName];
+    const block = findBlock(d.promptName);
+    return d.label !== prompt?.label || d.content !== prompt?.content || (!!block && d.role !== block.role);
   };
 
-  const handlePromptContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    if (!editingPromptName) return;
-    const newContent = e.target.value;
+  const confirmDiscard = async () =>
+    !draft ||
+    !isDraftChanged(draft) ||
+    !!(await globalContext.Popup.show.confirm(
+      'Unsaved changes',
+      `Discard your changes to "${draft.label.trim() || 'the new prompt'}"?`,
+    ));
+
+  const openEditor = async (promptName?: string) => {
+    if (draft && draft.promptName === promptName) return;
+    if (!(await confirmDiscard())) return;
+    setDraft(makeDraft(promptName));
+  };
+
+  const closeEditor = async () => {
+    if (await confirmDiscard()) setDraft(null);
+  };
+
+  const handleSavePrompt = () => {
+    if (!draft) return;
+    const isBuiltIn = !!draft.promptName && isSystemPrompt(draft.promptName);
+    const label = draft.label.trim();
+    if (!isBuiltIn) {
+      if (!label) {
+        st_echo('error', 'Enter a name for the prompt.');
+        return;
+      }
+      const taken = Object.entries(settings.prompts).some(
+        ([key, prompt]) => key !== draft.promptName && prompt.label.toLowerCase() === label.toLowerCase(),
+      );
+      if (taken) {
+        st_echo('error', `A prompt named "${label}" already exists.`);
+        return;
+      }
+    }
+
+    const promptName = draft.promptName ?? uniquePromptId(convertToVariableName(label), Object.keys(settings.prompts));
     updateAndRefresh((s) => {
-      const prompt = s.prompts[editingPromptName];
-      if (prompt) {
-        s.prompts = {
-          ...s.prompts,
-          [editingPromptName]: {
-            ...prompt,
-            content: newContent,
-            isDefault: isSystemPrompt(editingPromptName)
-              ? DEFAULT_PROMPT_CONTENTS[editingPromptName as SystemPromptKey] === newContent
-              : false,
+      s.prompts = {
+        ...s.prompts,
+        [promptName]: {
+          label: isBuiltIn ? s.prompts[promptName].label : label,
+          content: draft.content,
+          isDefault: isBuiltIn ? DEFAULT_PROMPT_CONTENTS[promptName as SystemPromptKey] === draft.content : false,
+        },
+      };
+      const preset = s.mainContextTemplatePresets[s.mainContextTemplatePreset];
+      if (preset) {
+        // A new prompt is added at the top, switched off, like Insert
+        const withPrompt = draft.promptName ? preset : insertPrompt(preset, promptName);
+        s.mainContextTemplatePresets = {
+          ...s.mainContextTemplatePresets,
+          [s.mainContextTemplatePreset]: {
+            ...withPrompt,
+            prompts: withPrompt.prompts.map((p) =>
+              p.promptName === promptName && draft.role ? { ...p, role: draft.role } : p,
+            ),
           },
         };
       }
     });
+    if (!draft.promptName) setLibraryPromptName(promptName);
+    setDraft(null);
   };
 
-  const handleRestorePromptDefault = async () => {
-    if (!editingPromptName || !editingPrompt || !isSystemPrompt(editingPromptName)) return;
-    const confirm = await globalContext.Popup.show.confirm(
-      'Restore Default',
-      `Restore default for "${editingPrompt.label}"?`,
-    );
-    if (!confirm) return;
-    updateAndRefresh((s) => {
-      s.prompts = {
-        ...s.prompts,
-        [editingPromptName]: {
-          ...s.prompts[editingPromptName],
-          content: DEFAULT_PROMPT_CONTENTS[editingPromptName as SystemPromptKey],
-          isDefault: true,
-        },
-      };
-    });
+  const handleRestorePromptDefault = () => {
+    if (!draft?.promptName || !isSystemPrompt(draft.promptName)) return;
+    setDraft({ ...draft, content: DEFAULT_PROMPT_CONTENTS[draft.promptName as SystemPromptKey] });
   };
 
   // --- Other Settings & Reset ---
@@ -269,7 +291,7 @@ export const CharacterCreatorSettings: FC = () => {
     const confirm = await globalContext.Popup.show.confirm('Reset Everything', 'Are you sure? This cannot be undone.');
     if (confirm) {
       settingsManager.resetSettings();
-      setEditingPromptName(null);
+      setDraft(null);
       forceUpdate();
       st_echo('success', 'Settings have been reset.');
     }
@@ -277,28 +299,30 @@ export const CharacterCreatorSettings: FC = () => {
 
   const canDeleteSelected = selectedLibraryPrompt !== CHAT_HISTORY_PROMPT && !isSystemPrompt(selectedLibraryPrompt);
 
-  // `block` is the prompt's entry in the current template, whose role is set here, like in ST's prompt editor
-  const renderEditor = (block?: MainContextPromptBlock) =>
-    editingPromptName &&
-    editingPrompt && (
+  const renderEditor = () => {
+    if (!draft) return null;
+    const isBuiltIn = !!draft.promptName && isSystemPrompt(draft.promptName);
+    // Only a prompt in the current template (or a new one, which goes there) has a role
+    const hasRole = !draft.promptName || !!findBlock(draft.promptName);
+    return (
       <div className="charCreator_promptEditor" ref={editorRef}>
-        {!isSystemPrompt(editingPromptName) && (
+        {!isBuiltIn && (
           <>
             <label className="charCreator_settingsLabel">Name</label>
             <STInput
               type="text"
-              value={editingPrompt.label}
-              onChange={(e) => handlePromptLabelChange(e.target.value)}
-              onBlur={handlePromptLabelBlur}
+              value={draft.label}
+              autoFocus={!draft.promptName}
+              onChange={(e) => setDraft({ ...draft, label: e.target.value })}
             />
           </>
         )}
-        {block && (
+        {hasRole && (
           <>
             <label className="charCreator_settingsLabel">Role</label>
             <STSelect
-              value={block.role}
-              onChange={(e) => handleRoleChange(block.promptName, e.target.value as MessageRole)}
+              value={draft.role ?? 'system'}
+              onChange={(e) => setDraft({ ...draft, role: e.target.value as MessageRole })}
             >
               {ROLE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -308,34 +332,39 @@ export const CharacterCreatorSettings: FC = () => {
             </STSelect>
           </>
         )}
-        <div className="charCreator_promptEditorHeader">
-          <label className="charCreator_settingsLabel">Prompt</label>
-          {isSystemPrompt(editingPromptName) && (
-            <STButton
-              className="fa-solid fa-undo"
-              title="Restore this prompt to default"
-              onClick={handleRestorePromptDefault}
-            />
-          )}
-          <STButton className="fa-solid fa-xmark" title="Close" onClick={() => setEditingPromptName(null)} />
-        </div>
+        <label className="charCreator_settingsLabel">Prompt</label>
         <STTextarea
-          value={editingPrompt.content}
-          onChange={handlePromptContentChange}
+          value={draft.content}
+          onChange={(e) => setDraft({ ...draft, content: e.target.value })}
           placeholder="Prompt text"
           rows={14}
           style={{ width: '100%' }}
         />
+        <div className="charCreator_promptEditorButtons">
+          {isBuiltIn && (
+            <STButton title="Put the default text in the editor" onClick={handleRestorePromptDefault}>
+              <i className="fa-solid fa-undo" /> Restore default
+            </STButton>
+          )}
+          <span className="charCreator_promptEditorActions">
+            <STButton onClick={closeEditor}>Cancel</STButton>
+            <STButton onClick={handleSavePrompt} disabled={!isDraftChanged(draft)}>
+              <i className="fa-solid fa-floppy-disk" /> Save
+            </STButton>
+          </span>
+        </div>
       </div>
     );
+  };
 
-  // The editor opens under the prompt's row, or under the prompt bar if the template doesn't have the prompt
-  const isEditingInList = !!currentTemplate?.prompts.some((p) => p.promptName === editingPromptName);
+  // The editor opens under the prompt's row, or under the prompt bar for a new prompt or one the template doesn't have
+  const isEditingInList = !!findBlock(draft?.promptName);
 
   const mainContextListItems = (currentTemplate?.prompts ?? []).map((block): SortableListItemData => {
     const isChatHistory = block.promptName === CHAT_HISTORY_PROMPT;
     const exists = isChatHistory || !!settings.prompts[block.promptName];
     const label = getPromptLabel(block.promptName);
+    const isOpen = isEditingInList && draft?.promptName === block.promptName;
     return {
       id: block.promptName,
       enabled: block.enabled,
@@ -359,11 +388,12 @@ export const CharacterCreatorSettings: FC = () => {
               onClick={() => updateCurrentTemplate((preset) => removePrompt(preset, block.promptName))}
             />
             {exists && !isChatHistory ? (
+              // While the editor is open under the row, the same button closes it
               <STButton
                 overrideDefaults
-                className="charCreator_promptAction fa-solid fa-pencil"
-                title="Edit prompt"
-                onClick={() => setEditingPromptName(block.promptName)}
+                className={`charCreator_promptAction fa-solid ${isOpen ? 'fa-xmark' : 'fa-pencil'}`}
+                title={isOpen ? 'Close editor' : 'Edit prompt'}
+                onClick={() => (isOpen ? closeEditor() : openEditor(block.promptName))}
               />
             ) : (
               <span className="charCreator_promptAction" />
@@ -375,7 +405,7 @@ export const CharacterCreatorSettings: FC = () => {
               onClick={() => handleToggle(block.promptName)}
             />
           </div>
-          {editingPromptName === block.promptName && renderEditor(block)}
+          {isOpen && renderEditor()}
         </>
       ),
     };
@@ -413,7 +443,7 @@ export const CharacterCreatorSettings: FC = () => {
             className="fa-solid fa-pencil"
             title="Edit prompt"
             disabled={selectedLibraryPrompt === CHAT_HISTORY_PROMPT}
-            onClick={() => setEditingPromptName(selectedLibraryPrompt)}
+            onClick={() => openEditor(selectedLibraryPrompt)}
           />
           <STButton
             className="caution fa-solid fa-x"
@@ -426,7 +456,7 @@ export const CharacterCreatorSettings: FC = () => {
             title="Reset this template to the default prompt list"
             onClick={handleRestoreMainContextDefault}
           />
-          <STButton className="fa-solid fa-plus-square" title="New prompt" onClick={handleNewPrompt} />
+          <STButton className="fa-solid fa-plus-square" title="New prompt" onClick={() => openEditor()} />
         </div>
         {!isEditingInList && renderEditor()}
         <div style={{ marginTop: '5px' }}>

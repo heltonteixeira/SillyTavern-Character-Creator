@@ -735,8 +735,7 @@
         color: var(--success-color, #4caf50);
     }
 
-    .charCreator_promptBar,
-    .charCreator_promptEditorHeader {
+    .charCreator_promptBar {
         display: flex;
         align-items: center;
         gap: 2px;
@@ -757,9 +756,28 @@
         margin-top: 5px;
         white-space: normal;
 
-        .charCreator_promptEditorHeader .charCreator_settingsLabel {
-            flex: 1;
+        .charCreator_settingsLabel:first-child {
             margin-top: 0;
+        }
+    }
+
+    .charCreator_promptEditorButtons {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 5px;
+        margin-top: 5px;
+
+        .menu_button {
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        // Cancel and Save stay together on the right, also when they wrap
+        .charCreator_promptEditorActions {
+            display: flex;
+            gap: 5px;
+            margin-left: auto;
         }
     }
 }
