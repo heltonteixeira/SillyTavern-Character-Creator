@@ -177,8 +177,9 @@ function nativeModeKey(profileId: string): string {
 /**
  * Requests JSON matching `schema`. The schema is first sent as native structured output, which ST turns into
  * provider-specific options. If the provider rejects it or the reply doesn't match the schema (e.g. an endpoint that
- * ignores the schema), the schema is asked for in the prompt instead ("Revise Session (JSON Mode)" template), and from
- * then on for this profile and model until the page is reloaded.
+ * ignores the schema), the schema is asked for in the prompt instead ("Revise Session (JSON Mode)" template). If that
+ * works, it's used from then on for this profile and model until the page is reloaded. If it fails too, the provider
+ * is failing for another reason (e.g. down or rate-limited), so native mode is tried again next time.
  */
 export async function makeStructuredRequest<T extends z.ZodType<any, any, any>>(
   profileId: string,
@@ -191,6 +192,7 @@ export async function makeStructuredRequest<T extends z.ZodType<any, any, any>>(
   const jsonSchema = z.toJSONSchema(schema);
 
   const key = nativeModeKey(profileId);
+  let nativeError: Error | undefined;
   if (!nativeModeFailed.has(key)) {
     try {
       const response = await sendRawRequest(
@@ -205,12 +207,8 @@ export async function makeStructuredRequest<T extends z.ZodType<any, any, any>>(
       if (!(error instanceof RequestError || error instanceof UnusableResponseError)) {
         throw error;
       }
-      nativeModeFailed.add(key);
       console.warn('Native structured output failed, asking for JSON in the prompt instead:', error);
-      st_echo(
-        'info',
-        `Native structured output didn't work for this profile, so JSON is asked for in the prompt until the page is reloaded. ${error.message}`,
-      );
+      nativeError = error;
     }
   }
 
@@ -236,5 +234,13 @@ export async function makeStructuredRequest<T extends z.ZodType<any, any, any>>(
   const instructionMessage: Message = { role: 'system', content: resolvedPrompt };
 
   const response = await sendRawRequest(profileId, [...baseMessages, instructionMessage], maxResponseToken, {}, signal);
-  return parseStructuredResponse(response, schema, schemaName);
+  const result = parseStructuredResponse(response, schema, schemaName);
+  if (nativeError) {
+    nativeModeFailed.add(key);
+    st_echo(
+      'info',
+      `Native structured output didn't work for this profile, so JSON is asked for in the prompt until the page is reloaded. ${nativeError.message}`,
+    );
+  }
+  return result;
 }

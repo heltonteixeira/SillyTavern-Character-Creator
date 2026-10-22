@@ -228,6 +228,22 @@ describe('request compatibility', () => {
     expect(sendRequest.mock.calls[1][4]).not.toHaveProperty('json_schema');
   });
 
+  test("doesn't remember the prompt mode when that request fails too", async () => {
+    const providerError = new Error('API request failed', { cause: new Error('Rate limit exceeded') });
+    sendRequest.mockRejectedValueOnce(providerError).mockRejectedValueOnce(providerError);
+    const request = () =>
+      makeStructuredRequest('provider-down', [], FieldSpecificResponseSchema, 'FieldRevision', 1024);
+
+    await expect(request()).rejects.toThrow('Rate limit exceeded');
+    expect(sendRequest).toHaveBeenCalledTimes(2);
+    expect(stEcho).not.toHaveBeenCalled();
+
+    sendRequest.mockResolvedValue(openAiResponse(JSON.stringify(fieldReply)));
+    await expect(request()).resolves.toEqual(fieldReply);
+    expect(sendRequest).toHaveBeenCalledTimes(3);
+    expect(sendRequest.mock.calls[2][4]).toHaveProperty('json_schema');
+  });
+
   test("doesn't retry an empty native reply", async () => {
     sendRequest.mockResolvedValue(openAiResponse('', 'stop'));
     await expect(

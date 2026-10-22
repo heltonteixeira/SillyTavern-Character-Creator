@@ -19418,42 +19418,43 @@ function D4(n) {
 }
 async function T4(n, r, i, l, o, c) {
   const h = r3(i), m = D4(n);
+  let g;
   if (!jy.has(m))
     try {
-      const f = await pu(
+      const x = await pu(
         n,
         r,
         o,
         { json_schema: { name: l, strict: !0, value: h } },
         c
       );
-      return Ry(f, i, l);
-    } catch (f) {
-      if (!(f instanceof l1 || f instanceof wh))
-        throw f;
-      jy.add(m), console.warn("Native structured output failed, asking for JSON in the prompt instead:", f), Ae(
-        "info",
-        `Native structured output didn't work for this profile, so JSON is asked for in the prompt until the page is reloaded. ${f.message}`
-      );
+      return Ry(x, i, l);
+    } catch (x) {
+      if (!(x instanceof l1 || x instanceof wh))
+        throw x;
+      console.warn("Native structured output failed, asking for JSON in the prompt instead:", x), g = x;
     }
-  const g = vt.getSettings(), v = g.prompts.reviseJsonPrompt?.content;
-  if (!v)
+  const v = vt.getSettings(), _ = v.prompts.reviseJsonPrompt?.content;
+  if (!_)
     throw new Error('The "Revise Session (JSON Mode)" prompt template is missing.');
-  const _ = {
+  const b = {
     example_response: m4(h),
     schema: JSON.stringify(h, null, 2)
   };
-  let b;
+  let y;
   try {
-    b = bi.compile(v, { noEscape: !0, strict: !0 })(_);
-  } catch (f) {
-    const S = g.prompts.reviseJsonPrompt?.label ?? "reviseJsonPrompt";
+    y = bi.compile(_, { noEscape: !0, strict: !0 })(b);
+  } catch (x) {
+    const D = v.prompts.reviseJsonPrompt?.label ?? "reviseJsonPrompt";
     throw new Error(
-      `Failed to render the "${S}" prompt template: ${f?.message ?? f}. Available variables: ${Object.keys(_).join(", ")}.`
+      `Failed to render the "${D}" prompt template: ${x?.message ?? x}. Available variables: ${Object.keys(b).join(", ")}.`
     );
   }
-  const y = { role: "system", content: b }, p = await pu(n, [...r, y], o, {}, c);
-  return Ry(p, i, l);
+  const p = { role: "system", content: y }, f = await pu(n, [...r, p], o, {}, c), S = Ry(f, i, l);
+  return g && (jy.add(m), Ae(
+    "info",
+    `Native structured output didn't work for this profile, so JSON is asked for in the prompt until the page is reloaded. ${g.message}`
+  )), S;
 }
 const On = [
   "name",
