@@ -54,6 +54,8 @@ interface PromptDraft {
   content: string;
   /** The role of the prompt's entry in the current template, if it has one */
   role?: MessageRole;
+  /** Open under the prompt's row; otherwise under the prompt bar. Actions that take the row away close the editor. */
+  inList: boolean;
 }
 
 const isSystemPrompt = (promptName: string) => SYSTEM_PROMPT_KEYS.includes(promptName as SystemPromptKey);
@@ -120,16 +122,33 @@ export const CharacterCreatorSettings: FC = () => {
   const findBlock = (promptName?: string) =>
     promptName ? currentTemplate?.prompts.find((p) => p.promptName === promptName) : undefined;
 
-  // The role belongs to the template's entry, so it follows the selected template
+  // The role belongs to the template's entry, so it follows the selected template (and a reset or insert)
+  const draftBlockRole = findBlock(draft?.promptName)?.role;
   useEffect(() => {
     setDraft((d) => (d?.promptName ? { ...d, role: findBlock(d.promptName)?.role ?? d.role } : d));
-  }, [settings.mainContextTemplatePreset]);
+  }, [settings.mainContextTemplatePreset, draftBlockRole]);
 
   // --- Handlers for Main Context Template ---
-  const handleMainContextPresetChange = (newValue?: string) => {
+  const handleMainContextPresetChange = async (newValue?: string, oldValue?: string) => {
+    const name = newValue ?? 'default';
+    const presets = settingsManager.getSettings().mainContextTemplatePresets;
+    // An editor open under a row closes when the new template doesn't have that prompt
+    if (draft?.inList && !presets[name]?.prompts.some((p) => p.promptName === draft.promptName)) {
+      // A deleted template already asked in handleMainContextPresetDelete
+      if (oldValue && presets[oldValue] && !(await confirmDiscard())) return;
+      setDraft(null);
+    }
     updateAndRefresh((s) => {
-      s.mainContextTemplatePreset = newValue ?? 'default';
+      s.mainContextTemplatePreset = name;
     });
+  };
+
+  // Deleting the template closes an editor open under one of its rows
+  const handleMainContextPresetDelete = async () => {
+    if (!draft?.inList) return true;
+    if (!(await confirmDiscard())) return false;
+    setDraft(null);
+    return true;
   };
 
   const handleMainContextPresetsChange = (newItems: PresetItem[]) => {
@@ -171,7 +190,12 @@ export const CharacterCreatorSettings: FC = () => {
       `Reset "${name}" to the default prompt list?`,
     );
     if (!confirm) return;
-    updateCurrentTemplate(() => structuredClone(DEFAULT_SETTINGS.mainContextTemplatePresets['default']));
+    const defaults = structuredClone(DEFAULT_SETTINGS.mainContextTemplatePresets['default']);
+    if (draft?.inList && !defaults.prompts.some((p) => p.promptName === draft.promptName)) {
+      if (!(await confirmDiscard())) return;
+      setDraft(null);
+    }
+    updateCurrentTemplate(() => defaults);
   };
 
   // --- Handlers for the prompt dropdown ---
@@ -206,6 +230,7 @@ export const CharacterCreatorSettings: FC = () => {
       content: prompt?.content ?? '',
       // A new prompt goes into the current template
       role: promptName ? findBlock(promptName)?.role : 'system',
+      inList: !!findBlock(promptName),
     };
   };
 
@@ -225,13 +250,26 @@ export const CharacterCreatorSettings: FC = () => {
     ));
 
   const openEditor = async (promptName?: string) => {
-    if (draft && draft.promptName === promptName) return;
+    if (draft && draft.promptName === promptName) {
+      // Already open: move it under the row if the prompt was inserted meanwhile, keeping the changes
+      const inList = !!findBlock(promptName);
+      if (draft.inList !== inList) setDraft({ ...draft, inList });
+      return;
+    }
     if (!(await confirmDiscard())) return;
     setDraft(makeDraft(promptName));
   };
 
   const closeEditor = async () => {
     if (await confirmDiscard()) setDraft(null);
+  };
+
+  // Removing the row whose editor is open closes the editor, instead of moving it under the prompt bar
+  const handleRemoveFromTemplate = async (promptName: string) => {
+    const isOpen = !!draft?.inList && draft.promptName === promptName;
+    if (isOpen && !(await confirmDiscard())) return;
+    updateCurrentTemplate((preset) => removePrompt(preset, promptName));
+    if (isOpen) setDraft(null);
   };
 
   const handleSavePrompt = () => {
@@ -358,7 +396,7 @@ export const CharacterCreatorSettings: FC = () => {
   };
 
   // The editor opens under the prompt's row, or under the prompt bar for a new prompt or one the template doesn't have
-  const isEditingInList = !!findBlock(draft?.promptName);
+  const isEditingInList = !!draft?.inList;
 
   const mainContextListItems = (currentTemplate?.prompts ?? []).map((block): SortableListItemData => {
     const isChatHistory = block.promptName === CHAT_HISTORY_PROMPT;
@@ -385,7 +423,7 @@ export const CharacterCreatorSettings: FC = () => {
               overrideDefaults
               className="charCreator_promptAction caution fa-solid fa-chain-broken"
               title="Remove from this template"
-              onClick={() => updateCurrentTemplate((preset) => removePrompt(preset, block.promptName))}
+              onClick={() => handleRemoveFromTemplate(block.promptName)}
             />
             {exists && !isChatHistory ? (
               // While the editor is open under the row, the same button closes it
@@ -425,6 +463,7 @@ export const CharacterCreatorSettings: FC = () => {
           readOnlyValues={['default']}
           onChange={handleMainContextPresetChange}
           onItemsChange={handleMainContextPresetsChange}
+          onDelete={handleMainContextPresetDelete}
           enableCreate
           enableRename
           enableDelete
