@@ -119,10 +119,8 @@
         display: flex;
         gap: 15px;
         flex-direction: row-reverse;
-
-        @media (max-width: 768px) {
-            flex-wrap: wrap;
-        }
+        /* The popup can be narrower than the viewport (ST's chat width), so wrap whenever the buttons don't fit. */
+        flex-wrap: wrap;
 
         button {
             padding: 10px 20px;
