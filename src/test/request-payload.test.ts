@@ -202,11 +202,55 @@ describe('RequestError', () => {
     expect(error.message).toBe('CREC - Claude (claude-sonnet-5-5): Insufficient balance');
   });
 
-  test("points to the server console when ST didn't pass on the reason", () => {
-    const error = new RequestError(profile, new Error('API request failed', { cause: new Error('Response not OK') }));
+  const consoleNote = "SillyTavern didn't pass on the provider's reason; it's in the SillyTavern server console.";
+
+  test("lists what to check when ST didn't pass on the reason", () => {
+    const error = new RequestError(profile, new Error('API request failed', { cause: new Error('Response not OK') }), {
+      maxTokens: 327682,
+      mainApi: 'openai',
+    });
     expect(error.message).toBe(
-      "CREC - Claude (claude-sonnet-5-5): Response not OK. SillyTavern didn't pass on the provider's reason; " +
-        "it's in the SillyTavern server console.",
+      'CREC - Claude (claude-sonnet-5-5): The request failed. Check that Max Response Tokens (327682) is within ' +
+        `the model's output limit, the profile's model exists and its API key is valid. ${consoleNote}`,
+    );
+  });
+
+  test('asks Text Completion users to check the server', () => {
+    const error = new RequestError({ name: 'Kobold' }, new Error('Response not OK'), {
+      maxTokens: 512,
+      mainApi: 'textgenerationwebui',
+    });
+    expect(error.message).toBe(
+      'Kobold: The request failed. Check that the server is running, its model is loaded, and ' +
+        `Max Response Tokens (512) is within its limit. ${consoleNote}`,
+    );
+  });
+
+  test('explains the HTTP status that OpenAI-compatible sources pass on', () => {
+    const glm = { name: 'GLM', model: 'glm-5.2' };
+    const fail = (reason: string) =>
+      new RequestError(glm, new Error('API request failed', { cause: new Error(reason) }), {
+        maxTokens: 4096,
+        mainApi: 'openai',
+      }).message;
+    expect(fail('Bad Request')).toBe(
+      "GLM (glm-5.2): Bad Request (HTTP 400). Check that Max Response Tokens (4096) is within the model's output " +
+        `limit, then the profile's model and its preset's settings. ${consoleNote}`,
+    );
+    expect(fail('Unauthorized')).toBe(
+      `GLM (glm-5.2): Unauthorized (HTTP 401). Check the API key of the profile's connection. ${consoleNote}`,
+    );
+    expect(fail('Too Many Requests')).toContain('(HTTP 429). Rate limit or quota reached.');
+    expect(fail('Service Unavailable')).toContain('(HTTP 503). The provider had a problem. Try again later.');
+    expect(fail('Unknown error occurred')).toContain('The request failed. Check that Max Response Tokens (4096)');
+  });
+
+  test('reads the status of "Got response status"', () => {
+    expect(new RequestError({ name: 'X' }, new Error('Got response status 404')).message).toBe(
+      `X: Not Found (HTTP 404). Check the profile's model and API URL. ${consoleNote}`,
+    );
+    expect(new RequestError({ name: 'X' }, new Error('Got response status 418')).message).toContain(
+      'X: The request failed (HTTP 418). Check that Max Response Tokens is within',
     );
   });
 

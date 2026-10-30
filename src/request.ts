@@ -55,7 +55,7 @@ export async function sendRawRequest(
     if (signal?.aborted) {
       throw new DOMException('Request aborted by user', 'AbortError');
     }
-    throw new RequestError(profile, error);
+    throw new RequestError(profile, error, { maxTokens, mainApi });
   }
   if (signal?.aborted) {
     throw new DOMException('Request aborted by user', 'AbortError');
